@@ -26,7 +26,7 @@ interface StatsProbe {
 
 test.describe('M0 — engine boot', () => {
   test('boots with no console errors, shows the overlay and renders a non-blank scene', async ({ page }) => {
-    const errors = await bootGame(page, 'test=1&preset=low&debug=1');
+    const errors = await bootGame(page, 'test=1&preset=low&debug=1&scene=playground');
     await expect(page.getByTestId('debug-overlay')).toBeVisible();
     await waitTicks(page, 45);
     const color = await page.evaluate(() => window.__HARBOR__?.canvasProbe());
@@ -39,7 +39,7 @@ test.describe('M0 — engine boot', () => {
   });
 
   test('physics: dropped boxes fall and never pass through the ground', async ({ page }) => {
-    const errors = await bootGame(page);
+    const errors = await bootGame(page, 'test=1&preset=low&scene=playground');
     await runCommand(page, 'autospawn off');
     await runCommand(page, 'reset');
     const spawn = await runCommand(page, 'spawn 20');
@@ -58,7 +58,7 @@ test.describe('M0 — engine boot', () => {
   });
 
   test('input: virtual device drives the camera through the binding layer', async ({ page }) => {
-    const errors = await bootGame(page);
+    const errors = await bootGame(page, 'test=1&preset=low&scene=playground');
     const start = await probe<CameraProbe>(page, 'camera');
     await page.evaluate(() => window.__HARBOR__?.input.keyDown('KeyW'));
     await waitTicks(page, 40);
@@ -73,7 +73,7 @@ test.describe('M0 — engine boot', () => {
   });
 
   test('dev console: real keystrokes open it, run commands, and block game input', async ({ page }) => {
-    const errors = await bootGame(page);
+    const errors = await bootGame(page, 'test=1&preset=low&scene=playground');
     await runCommand(page, 'autospawn off');
     await page.keyboard.press('Backquote');
     const input = page.getByTestId('console-input');
@@ -98,7 +98,7 @@ test.describe('M0 — engine boot', () => {
   });
 
   test('pause, single-step and resume the fixed-step simulation', async ({ page }) => {
-    const errors = await bootGame(page);
+    const errors = await bootGame(page, 'test=1&preset=low&scene=playground');
     await runCommand(page, 'pause');
     const pausedAt = await page.evaluate(() => window.__HARBOR__?.tick() ?? 0);
     await page.waitForTimeout(400);

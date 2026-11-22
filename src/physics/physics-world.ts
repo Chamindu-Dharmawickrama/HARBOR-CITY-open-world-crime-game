@@ -1,4 +1,4 @@
-import type { Collider, RigidBody, World as RapierWorld, Ray } from '@dimforge/rapier3d-compat';
+import type { Collider, EventQueue, RigidBody, World as RapierWorld, Ray } from '@dimforge/rapier3d-compat';
 import { FIXED_STEP_SECONDS } from '../core/loop';
 import { GROUPS_DYNAMIC_PROP, GROUPS_STATIC_WORLD } from './collision-groups';
 import type { Rapier } from './rapier';
@@ -35,6 +35,7 @@ export interface BoxBodyOptions {
 export class PhysicsWorld {
   readonly world: RapierWorld;
   private readonly ray: Ray;
+  private readonly events: EventQueue;
 
   constructor(
     readonly rapier: Rapier,
@@ -44,10 +45,23 @@ export class PhysicsWorld {
     this.world = new rapier.World({ x: 0, y: gravityY, z: 0 });
     this.world.timestep = stepSeconds;
     this.ray = new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+    this.events = new rapier.EventQueue(true);
   }
 
+  /** Advances one fixed step. Events from the previous step that nobody drained are dropped. */
   step(): void {
-    this.world.step();
+    this.events.clear();
+    this.world.step(this.events);
+  }
+
+  /**
+   * Reports contact-force events from the last step (only colliders created with
+   * CONTACT_FORCE_EVENTS and a force threshold produce them).
+   */
+  drainContactForces(handler: (collider1: number, collider2: number, magnitude: number) => void): void {
+    this.events.drainContactForceEvents((event) =>
+      handler(event.collider1(), event.collider2(), event.totalForceMagnitude()),
+    );
   }
 
   get bodyCount(): number {

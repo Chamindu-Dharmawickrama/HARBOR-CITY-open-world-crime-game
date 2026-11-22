@@ -14,6 +14,12 @@ export interface QualitySettings {
   readonly shadowMapSize: number;
   /** Camera far plane and fog end, metres. */
   readonly drawDistance: number;
+  /** Radius of full-detail world streaming (meshes + colliders), metres. */
+  readonly nearRing: number;
+  /** Street furniture draw distance, metres. */
+  readonly propDistance: number;
+  /** Half size of the sun shadow frustum around the camera, metres. */
+  readonly shadowExtent: number;
 }
 
 export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings>> = {
@@ -25,6 +31,9 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     shadows: true,
     shadowMapSize: 1024,
     drawDistance: 500,
+    nearRing: 160,
+    propDistance: 140,
+    shadowExtent: 90,
   },
   medium: {
     name: 'medium',
@@ -34,6 +43,9 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     shadows: true,
     shadowMapSize: 2048,
     drawDistance: 800,
+    nearRing: 220,
+    propDistance: 220,
+    shadowExtent: 130,
   },
   high: {
     name: 'high',
@@ -43,6 +55,9 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     shadows: true,
     shadowMapSize: 4096,
     drawDistance: 1200,
+    nearRing: 260,
+    propDistance: 300,
+    shadowExtent: 180,
   },
 };
 

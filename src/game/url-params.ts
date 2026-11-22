@@ -14,6 +14,8 @@ export interface UrlParams {
   /** Benchmark scenario to run, or null for normal play. */
   bench: string | null;
   gpu: GpuPreference;
+  /** Which scene to load: the streamed city (default) or the M0 physics playground. */
+  scene: 'city' | 'playground';
 }
 
 function flag(params: URLSearchParams, name: string): boolean {
@@ -38,5 +40,6 @@ export function parseUrlParams(search: string): UrlParams {
     preset: isQualityPresetName(presetRaw) ? presetRaw : 'medium',
     bench: bench === null || bench === '' ? null : bench,
     gpu: gpuRaw === 'low-power' || gpuRaw === 'high-performance' ? gpuRaw : 'default',
+    scene: params.get('scene') === 'playground' ? 'playground' : 'city',
   };
 }

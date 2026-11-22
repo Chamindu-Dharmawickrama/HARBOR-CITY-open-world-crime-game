@@ -9,6 +9,7 @@
  * Options: --scenario=<name> (default playground) · --presets=<list> (default medium)
  *          --gpu=default|low-power|high-performance · --width/--height (default 1920x1080)
  *          --no-build · --headless (software fallback; numbers are not representative)
+ *          --vsync (normal presentation at the display rate; checks real-world hitching)
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -28,6 +29,7 @@ function parseArgs(argv) {
     height: 1080,
     build: true,
     headless: false,
+    vsync: false,
   };
   for (const arg of argv) {
     const [key, value] = arg.replace(/^--/, '').split('=');
@@ -38,6 +40,7 @@ function parseArgs(argv) {
     else if (key === 'height' && value) options.height = Number(value);
     else if (key === 'no-build') options.build = false;
     else if (key === 'headless') options.headless = true;
+    else if (key === 'vsync') options.vsync = true;
     else throw new Error(`Unknown option ${arg}`);
   }
   return options;
@@ -75,6 +78,7 @@ function formatRow(r) {
     f(r.drawCalls.mean, 0).padStart(6),
     f(r.triangles.mean / 1000, 0).padStart(7),
     f(r.heapGrowthMBps, 2).padStart(8),
+    String(r.framesOver50ms ?? 'n/a').padStart(5),
     `${r.width}x${r.height}`,
   ].join('  ');
 }
@@ -97,9 +101,10 @@ async function main() {
         headless: options.headless,
         args: [
           '--ignore-gpu-blocklist',
+          ...(options.gpu === 'high-performance' ? ['--force_high_performance_gpu'] : []),
+          ...(options.gpu === 'low-power' ? ['--force_low_power_gpu'] : []),
           '--enable-gpu-rasterization',
-          '--disable-gpu-vsync',
-          '--disable-frame-rate-limit',
+          ...(options.vsync ? [] : ['--disable-gpu-vsync', '--disable-frame-rate-limit']),
           `--window-size=${options.width},${options.height}`,
         ],
       });
@@ -141,10 +146,24 @@ async function main() {
   };
   writeFileSync(file, JSON.stringify({ options, machine, results }, null, 2));
 
-  console.log(`\nScenario ${options.scenario} · uncapped frame rate · ${machine.cpu}`);
+  const pacing = options.vsync
+    ? 'vsync'
+    : 'uncapped (vsync off; D3D present-queue stalls can appear as >50 ms frames)';
+  console.log(`\nScenario ${options.scenario} · ${pacing} · ${machine.cpu}`);
   console.log(`GPU: ${results[0]?.gpu ?? 'n/a'}`);
-  console.log('preset     fps  avg ms  p95 ms  p99 ms  cpu ms  draws  ktris  heapMB/s  resolution');
+  console.log('preset     fps  avg ms  p95 ms  p99 ms  cpu ms  draws  ktris  heapMB/s  >50ms  resolution');
   for (const r of results) console.log(formatRow(r));
+  for (const r of results) {
+    if (r.longTasks)
+      console.log(
+        `  ${r.preset} long tasks: ${r.longTasks.count} (max ${r.longTasks.maxMs.toFixed(0)} ms, total ${r.longTasks.totalMs.toFixed(0)} ms)`,
+      );
+    for (const h of (r.hitches ?? []).slice(0, 5)) {
+      console.log(
+        `  hitch ${r.preset} t=${h.atSeconds.toFixed(1)}s frame ${h.frameMs.toFixed(1)} ms cpu ${h.cpuMs.toFixed(1)} ms: ${h.systems.map((x) => `${x.name} ${x.ms.toFixed(1)}`).join(', ')}`,
+      );
+    }
+  }
   const failures = results.filter((r) => r.errors.length > 0);
   for (const r of failures) console.log(`\n${r.preset} console errors:\n  ${r.errors.join('\n  ')}`);
   console.log(`\nSaved ${file}`);

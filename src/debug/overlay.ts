@@ -25,6 +25,8 @@ export interface OverlaySnapshot {
   seed: number;
   resolution: string;
   systems: readonly ProfileEntry[];
+  /** Scene-specific lines (streaming, props, …). */
+  extra: readonly string[];
 }
 
 const GRAPH_WIDTH = 240;
@@ -97,6 +99,7 @@ export class DebugOverlay {
       `entities ${s.entities}   bodies ${s.bodies} (awake ${s.awakeBodies})   colliders ${s.colliders}   heap ${heap}`,
       `tick ${s.tick}   sim ${s.simTime.toFixed(1)} s   x${s.timeScale}${s.paused ? '   PAUSED' : ''}   seed ${s.seed}`,
       `preset ${s.preset}   ${s.resolution}   gpu ${s.gpu}`,
+      ...s.extra,
       'systems (avg / max ms):',
       ...s.systems
         .slice(0, 10)

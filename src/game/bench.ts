@@ -23,6 +23,19 @@ export interface BenchResult extends BenchMeta {
   heapStartMB: number | null;
   heapEndMB: number | null;
   heapGrowthMBps: number | null;
+  framesOver33ms: number;
+  framesOver50ms: number;
+  /** Main-thread tasks over 50 ms reported by the browser while recording (GC, message handling…). */
+  longTasks: { count: number; maxMs: number; totalMs: number };
+  /** Worst frames with the systems that took the most time in them. */
+  hitches: BenchHitch[];
+}
+
+export interface BenchHitch {
+  atSeconds: number;
+  frameMs: number;
+  cpuMs: number;
+  systems: { name: string; ms: number }[];
 }
 
 type Phase = 'warmup' | 'recording' | 'done';
@@ -46,6 +59,12 @@ export class BenchRecorder {
   private triMax = 0;
   private heapStart: number | null = null;
   private heapEnd: number | null = null;
+  private over33 = 0;
+  private over50 = 0;
+  private readonly hitches: BenchHitch[] = [];
+  private longTaskCount = 0;
+  private longTaskMax = 0;
+  private longTaskTotal = 0;
 
   constructor(
     readonly warmupSeconds: number,
@@ -70,6 +89,7 @@ export class BenchRecorder {
     drawCalls: number,
     triangles: number,
     heapMB: number | null,
+    breakdown?: () => { name: string; ms: number }[],
   ): void {
     if (this.phase === 'done') return;
     this.elapsed += frameSeconds;
@@ -90,10 +110,26 @@ export class BenchRecorder {
     this.drawMax = Math.max(this.drawMax, drawCalls);
     this.triSum += triangles;
     this.triMax = Math.max(this.triMax, triangles);
+    const frameMs = frameSeconds * 1000;
+    if (frameMs > 33.4) this.over33++;
+    if (frameMs > 50) this.over50++;
+    if (frameMs > 33.4 || cpuMs > 30) {
+      this.hitches.push({ atSeconds: this.elapsed, frameMs, cpuMs, systems: breakdown ? breakdown() : [] });
+      this.hitches.sort((a, b) => b.frameMs - a.frameMs);
+      if (this.hitches.length > 12) this.hitches.length = 12;
+    }
     if (this.elapsed >= this.durationSeconds - TIME_EPSILON) {
       this.phase = 'done';
       this.heapEnd = heapMB;
     }
+  }
+
+  /** Records a browser long task (only counted while recording). */
+  longTask(durationMs: number): void {
+    if (this.phase !== 'recording') return;
+    this.longTaskCount++;
+    this.longTaskMax = Math.max(this.longTaskMax, durationMs);
+    this.longTaskTotal += durationMs;
   }
 
   result(meta: BenchMeta): BenchResult {
@@ -116,6 +152,10 @@ export class BenchRecorder {
       heapStartMB: this.heapStart,
       heapEndMB: this.heapEnd,
       heapGrowthMBps: heapGrowth,
+      framesOver33ms: this.over33,
+      framesOver50ms: this.over50,
+      longTasks: { count: this.longTaskCount, maxMs: this.longTaskMax, totalMs: this.longTaskTotal },
+      hitches: [...this.hitches],
     };
   }
 }

@@ -14,6 +14,7 @@ export class Profiler {
   private readonly names: string[] = [];
   private readonly slotsByName = new Map<string, number>();
   private frameTotals = new Float64Array(16);
+  private lastTotals = new Float64Array(16);
   private readonly history: RingBuffer[] = [];
 
   constructor(
@@ -32,6 +33,9 @@ export class Profiler {
       const grown = new Float64Array(this.frameTotals.length * 2);
       grown.set(this.frameTotals);
       this.frameTotals = grown;
+      const grownLast = new Float64Array(this.lastTotals.length * 2);
+      grownLast.set(this.lastTotals);
+      this.lastTotals = grownLast;
     }
     return slot;
   }
@@ -44,6 +48,7 @@ export class Profiler {
   endFrame(): void {
     for (let i = 0; i < this.names.length; i++) {
       this.history[i].push(this.frameTotals[i]);
+      this.lastTotals[i] = this.frameTotals[i];
       this.frameTotals[i] = 0;
     }
   }
@@ -56,6 +61,14 @@ export class Profiler {
       entries.push({ name: this.names[i], avgMs: ring.mean, maxMs: ring.max() });
     }
     return entries.sort((a, b) => b.avgMs - a.avgMs);
+  }
+
+  /** Per-section totals of the most recently committed frame, largest first (allocates; diagnostics only). */
+  lastFrame(limit = 5): { name: string; ms: number }[] {
+    return this.names
+      .map((name, i) => ({ name, ms: this.lastTotals[i] }))
+      .sort((a, b) => b.ms - a.ms)
+      .slice(0, limit);
   }
 
   average(name: string): number {

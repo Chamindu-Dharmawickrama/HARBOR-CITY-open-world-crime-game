@@ -23,6 +23,14 @@ describe('Profiler', () => {
     expect(profiler.now()).toBe(5);
   });
 
+  it('reports the last committed frame, largest first', () => {
+    const profiler = new Profiler(() => 0);
+    profiler.record(profiler.slot('a'), 1);
+    profiler.record(profiler.slot('b'), 4);
+    profiler.endFrame();
+    expect(profiler.lastFrame(1)).toEqual([{ name: 'b', ms: 4 }]);
+  });
+
   it('grows past its initial slot capacity', () => {
     const profiler = new Profiler(() => 0);
     for (let i = 0; i < 40; i++) profiler.record(profiler.slot(`s${i}`), i);

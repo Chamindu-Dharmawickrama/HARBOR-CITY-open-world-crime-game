@@ -11,6 +11,7 @@ describe('parseUrlParams', () => {
       preset: 'medium',
       bench: null,
       gpu: 'default',
+      scene: 'city',
     });
   });
 
@@ -35,6 +36,8 @@ describe('parseUrlParams', () => {
     expect(p.preset).toBe('medium');
     expect(p.gpu).toBe('default');
     expect(p.bench).toBeNull();
+    expect(parseUrlParams('?scene=playground').scene).toBe('playground');
+    expect(parseUrlParams('?scene=moon').scene).toBe('city');
   });
 });
 

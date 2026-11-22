@@ -17,6 +17,12 @@ conventions and current milestone status.
 | Perf reference | Radeon 780M iGPU = "mid-range laptop" for Medium; RTX 3050 Laptop for High | Both are in the dev machine |
 | World openness | All islands open from the start; the story sets where you go | Simpler progression, more sandbox |
 | Folder additions | `src/game/` (composition root) and `src/content/` (all data) in addition to the brief's folders | Prevents sideways domain imports; data in one place |
+| TypeScript | 6.0.3 (not 7.x); `noUncheckedIndexedAccess` off | typescript-eslint supports TS < 6.1; typed-array numeric code dominates (M0) |
+| City rendering | Ground and buildings are merged per 128 m chunk and per LOD (one draw call each); all street furniture is one `BatchedMesh`; signs are one `InstancedMesh` | ~95 draw calls for the whole visible city on Medium (M1) |
+| Ground surfaces | One procedural ground material for terrain, roads (lane markings, crosswalks, stop lines), sidewalks, plazas, seawalls, tunnel tiles; one facade material for all buildings | No textures to stream; surface chosen per vertex (M1) |
+| Generation determinism | City generation avoids `Math.hypot` (lint-enforced in `world/gen`) and quantises block outlines to 10 µm | Node and Chrome produce byte-identical layouts (verified by the M1 e2e hash test) (M1) |
+| Streaming uploads | Per-frame GPU upload budget in bytes (768 KB) plus compact vertex formats (i8 normals, u8 colours, u16 indices) | Avoids GPU command-buffer stalls when many chunks stream in at once (M1) |
+| Benchmark pacing | `npm run bench` reports uncapped headroom; `--vsync` is the real-world hitch check | Uncapped presentation on Windows saturates the D3D present queue (60–290 ms `Present` stalls in the GPU process) — an artefact absent with vsync (M1) |
 
 ## 1. Product summary
 
@@ -391,5 +397,11 @@ updated, commit `M<n>: …`, short report (what works, known-broken, how to hand
 - Ragdoll shoulders and hips use spherical joints with damping instead of cone limits.
 - SSR is on High only.
 - Physics runs on the main thread.
+- LOD changes pop (no cross-fade); rings and hysteresis keep them at a distance.
+- Occlusion culling works per chunk piece (128 m), with nearly-rectangular buildings ≥ 14 m as occluders; it mostly helps at street level.
+- Terrain surface types (lawn, lot paving, gravel) change on a 4 m grid inside blocks; kerbs and sidewalks hide the edges along streets.
+- Generation is verified identical between Node and Chrome; other engines (Firefox, Safari) are not formally guaranteed identical transcendental Math results, so a city there could differ in rare details for the same seed.
+- Bridges and the tunnel are always resident (not streamed); shop signs and billboards (~400) are all drawn by one instanced mesh.
+- Street lamps glow at night (`night` console command) but do not light the ground until the M8 lighting pass.
 
 (Updated as the build goes.)

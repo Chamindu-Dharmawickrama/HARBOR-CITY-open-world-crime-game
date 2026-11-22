@@ -67,6 +67,25 @@ export default defineConfig(
     },
   },
   {
+    // City generation must give identical results in every JS engine (main thread, workers, Node,
+    // other browsers): Math.hypot rounding is implementation-defined, sqrt is exact.
+    files: ['src/world/gen/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        MATH_RANDOM,
+        { object: 'Date', property: 'now', message: 'Use the sim clock.' },
+        { object: 'performance', property: 'now', message: 'Use the sim clock.' },
+        {
+          object: 'Math',
+          property: 'hypot',
+          message: 'Use geometry2d.hypot (deterministic across engines).',
+        },
+      ],
+    },
+  },
+  {
     files: ['*.config.{ts,js}', '.dependency-cruiser.cjs'],
     languageOptions: { globals: globals.node },
   },
