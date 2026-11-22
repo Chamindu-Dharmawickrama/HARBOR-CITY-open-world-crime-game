@@ -1,0 +1,10 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+bench-results/
+coverage/
+*.log
+.vite/
+.DS_Store
+.claude/settings.local.json
