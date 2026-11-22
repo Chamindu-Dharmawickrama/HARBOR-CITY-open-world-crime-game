@@ -1,0 +1,160 @@
+:root {
+  --hc-bg: #0b0f14;
+  --hc-fg: #e8edf2;
+  --hc-accent: #ffb547;
+  --hc-muted: #8a97a6;
+  --hc-panel: rgba(8, 12, 18, 0.82);
+  --hc-mono: ui-monospace, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;
+  --hc-sans: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--hc-bg);
+  color: var(--hc-fg);
+  font-family: var(--hc-sans);
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.hc-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.hc-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 40%, #1b2a3a 0%, var(--hc-bg) 70%);
+  z-index: 50;
+}
+
+.hc-loading h1 {
+  margin: 0;
+  font-size: clamp(36px, 7vw, 88px);
+  letter-spacing: 0.28em;
+  font-weight: 800;
+  color: var(--hc-accent);
+  text-shadow: 0 0 24px rgba(255, 181, 71, 0.35);
+}
+
+.hc-loading-status {
+  margin-top: 18px;
+  color: var(--hc-muted);
+  font-family: var(--hc-mono);
+  font-size: 14px;
+}
+
+.hc-debug-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 40;
+  padding: 8px 10px;
+  background: var(--hc-panel);
+  border-radius: 6px;
+  pointer-events: none;
+  max-width: calc(100vw - 16px);
+}
+
+.hc-debug-overlay[hidden] {
+  display: none;
+}
+
+.hc-debug-overlay pre {
+  margin: 6px 0 0;
+  font: 11px/1.35 var(--hc-mono);
+  white-space: pre;
+}
+
+.hc-debug-graph {
+  display: block;
+  width: 240px;
+  height: 56px;
+}
+
+.hc-console {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  background: rgba(5, 8, 12, 0.92);
+  border-top: 1px solid #263445;
+  font: 12px/1.4 var(--hc-mono);
+}
+
+.hc-console[hidden] {
+  display: none;
+}
+
+.hc-console-log {
+  margin: 0;
+  padding: 8px 12px;
+  height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: #c8d3de;
+}
+
+.hc-console-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-top: 1px solid #1b2633;
+  background: #0d141c;
+  color: var(--hc-fg);
+  font: inherit;
+  outline: none;
+}
+
+.hc-fatal {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  padding: 40px;
+  background: #160b0b;
+  overflow: auto;
+}
+
+.hc-fatal pre {
+  font: 12px/1.4 var(--hc-mono);
+  white-space: pre-wrap;
+  color: #ffb4b4;
+}
+
+.hc-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: var(--hc-panel);
+  color: var(--hc-muted);
+  font: 12px var(--hc-mono);
+  pointer-events: none;
+}
