@@ -1,4 +1,12 @@
-import type { Collider, EventQueue, RigidBody, World as RapierWorld, Ray } from '@dimforge/rapier3d-compat';
+import type {
+  Ball,
+  Collider,
+  EventQueue,
+  RigidBody,
+  World as RapierWorld,
+  Ray,
+  Vector,
+} from '@dimforge/rapier3d-compat';
 import { FIXED_STEP_SECONDS } from '../core/loop';
 import { GROUPS_DYNAMIC_PROP, GROUPS_STATIC_WORLD } from './collision-groups';
 import type { Rapier } from './rapier';
@@ -36,6 +44,10 @@ export class PhysicsWorld {
   readonly world: RapierWorld;
   private readonly ray: Ray;
   private readonly events: EventQueue;
+  private readonly balls = new Map<number, Ball>();
+  private readonly shapePos: Vector = { x: 0, y: 0, z: 0 };
+  private readonly shapeVel: Vector = { x: 0, y: 0, z: 0 };
+  private readonly identityRot = { x: 0, y: 0, z: 0, w: 1 };
 
   constructor(
     readonly rapier: Rapier,
@@ -177,6 +189,81 @@ export class PhysicsWorld {
     out.nz = hit.normal.z;
     out.collider = hit.collider;
     return true;
+  }
+
+  /**
+   * Sweeps a sphere from the origin along the direction (normalised internally) and returns the
+   * free travel distance (`maxDistance` when nothing is hit, 0 when it starts overlapping).
+   */
+  castSphere(
+    ox: number,
+    oy: number,
+    oz: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    radius: number,
+    maxDistance: number,
+    groups?: number,
+    excludeBody?: RigidBody,
+  ): number {
+    const len = Math.hypot(dx, dy, dz);
+    if (len === 0 || maxDistance <= 0) return Math.max(0, maxDistance);
+    this.shapePos.x = ox;
+    this.shapePos.y = oy;
+    this.shapePos.z = oz;
+    this.shapeVel.x = dx / len;
+    this.shapeVel.y = dy / len;
+    this.shapeVel.z = dz / len;
+    const hit = this.world.castShape(
+      this.shapePos,
+      this.identityRot,
+      this.shapeVel,
+      this.ball(radius),
+      0,
+      maxDistance,
+      true,
+      undefined,
+      groups,
+      undefined,
+      excludeBody,
+    );
+    return hit ? Math.max(0, Math.min(maxDistance, hit.time_of_impact)) : maxDistance;
+  }
+
+  /** True if a sphere at the point overlaps any collider (matching `groups`). */
+  overlapsSphere(
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    groups?: number,
+    excludeBody?: RigidBody,
+  ): boolean {
+    this.shapePos.x = x;
+    this.shapePos.y = y;
+    this.shapePos.z = z;
+    return (
+      this.world.intersectionWithShape(
+        this.shapePos,
+        this.identityRot,
+        this.ball(radius),
+        undefined,
+        groups,
+        undefined,
+        excludeBody,
+      ) !== null
+    );
+  }
+
+  private ball(radius: number): Ball {
+    const key = Math.round(radius * 1000);
+    let ball = this.balls.get(key);
+    if (!ball) {
+      ball = new this.rapier.Ball(key / 1000);
+      this.balls.set(key, ball);
+    }
+    return ball;
   }
 
   /** Line-segment buffers of every collider (for the physics debug view). */

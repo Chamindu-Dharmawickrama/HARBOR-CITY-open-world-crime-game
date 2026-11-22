@@ -36,3 +36,7 @@ export function groupsInteract(a: number, b: number): boolean {
 /** Common presets. */
 export const GROUPS_STATIC_WORLD = interactionGroups(Group.WORLD, ALL_GROUPS);
 export const GROUPS_DYNAMIC_PROP = interactionGroups(Group.PROP, ALL_GROUPS);
+/** Static street furniture: solid for characters and vehicles, ignored by the camera. */
+export const GROUPS_STATIC_PROP = interactionGroups(Group.PROP, ALL_GROUPS);
+/** What the third-person camera collides with (buildings, ground, landmarks, vehicles). */
+export const GROUPS_CAMERA_QUERY = interactionGroups(ALL_GROUPS, Group.WORLD | Group.VEHICLE);

@@ -21,12 +21,18 @@ const padAxis = (index: number, scale = 1): Binding => ({ kind: 'padAxis', index
 export const DEFAULT_BINDINGS: BindingMap = {
   moveX: [key('KeyD'), key('KeyA', -1), key('ArrowRight'), key('ArrowLeft', -1), padAxis(0)],
   moveY: [key('KeyW'), key('KeyS', -1), key('ArrowUp'), key('ArrowDown', -1), padAxis(1, -1)],
-  flyY: [key('KeyE'), key('Space'), key('KeyQ', -1), key('ControlLeft', -1), padButton(5), padButton(4, -1)],
+  flyY: [key('KeyE'), key('KeyQ', -1), padButton(12), padButton(13, -1)],
   lookX: [padAxis(2)],
   lookY: [padAxis(3, -1)],
   sprint: [key('ShiftLeft'), key('ShiftRight'), padButton(10)],
+  walk: [key('KeyZ')],
+  jump: [key('Space'), padButton(0)],
+  crouch: [key('KeyC'), key('ControlLeft'), padButton(1)],
+  aim: [mouse(2), padButton(6)],
   fire: [mouse(0), padButton(7)],
-  pause: [key('KeyP'), padButton(9)],
+  swapShoulder: [key('KeyX'), padButton(11)],
+  cameraMode: [key('KeyV'), padButton(8)],
+  pause: [key('KeyP'), key('Escape'), padButton(9)],
 };
 
 export function cloneBindings(map: BindingMap): BindingMap {
@@ -53,18 +59,23 @@ export function bindingsEqual(a: Binding, b: Binding): boolean {
 
 /**
  * Returns a new map where slot `slot` of `action` is replaced by `binding` (or appended if
- * slot === length). The same physical control is removed from every other action so one
- * key never triggers two actions.
+ * slot === length). The same physical control is removed from every other action and from the
+ * action's other slots, so one key never triggers two actions (or both halves of an axis).
  */
 export function rebind(map: BindingMap, action: InputAction, slot: number, binding: Binding): BindingMap {
   const next = cloneBindings(map);
+  const own = next[action];
+  if (slot < 0 || slot > own.length) throw new Error(`rebind: slot ${slot} out of range for ${action}`);
   for (const other of [...AXIS_ACTIONS, ...BUTTON_ACTIONS]) {
     if (other === action) continue;
     next[other] = next[other].filter((b) => !bindingsEqual(b, binding));
   }
-  const list = next[action];
-  if (slot < 0 || slot > list.length) throw new Error(`rebind: slot ${slot} out of range for ${action}`);
-  list[slot] = { ...binding };
+  const list: Binding[] = [];
+  for (let i = 0; i <= own.length; i++) {
+    if (i === slot) list.push({ ...binding });
+    else if (i < own.length && !bindingsEqual(own[i], binding)) list.push(own[i]);
+  }
+  next[action] = list;
   return next;
 }
 

@@ -21,19 +21,35 @@ Useful URL options: `?debug=1` (overlay at start) · `?preset=low|medium|high` �
 Milestone status lives in [CLAUDE.md](CLAUDE.md); the full plan, milestone acceptance criteria and known limitations
 are in [PLAN.md](PLAN.md).
 
-## Developer controls (engine test scene)
+## Controls (on foot)
+
+Click the view to capture the mouse. Every control can be rebound in **Esc → Controls** (saved in the browser).
 
 | Action | Keyboard / mouse | Gamepad |
 |---|---|---|
-| Look | Click the view, then move the mouse | Right stick |
 | Move | W A S D | Left stick |
-| Up / down | E / Q (Space / Ctrl) | RB / LB |
-| Fast | Shift | Left stick click |
-| Throw a box | Left click | RT |
-| Pause | P | Start |
-| Debug overlay | F3 | |
-| Physics collider lines | F4 | |
-| Developer console | ` (backtick) — type `help` | |
+| Look | Mouse | Right stick |
+| Sprint (uses stamina) | Shift | Left stick click |
+| Walk (hold) | Z | Tilt the stick gently |
+| Jump / climb a ledge / climb out of water | Space | A |
+| Crouch (toggle) | C or Left Ctrl | B |
+| Aim (over the shoulder) | Right mouse | LT |
+| Swap aim shoulder | X | Right stick click |
+| Camera distance | V | Back |
+| Pause menu | Esc or P | Start |
+
+## Developer tools
+
+| Tool | How |
+|---|---|
+| Debug overlay | F3 (or `?debug=1`) |
+| Physics collider lines | F4 |
+| Console | ` (backtick) — type `help` |
+| Free-fly camera | `fly` (WASD, E/Q up/down, Shift fast); `goto <place>` also switches to it |
+| Obstacle course | `course`, then `tpplayer wall12|wall26|tower10|tower30|water|ceiling|wallwalk` |
+| Player state | `damage <n>`, `heal`, `armor`, `kill`, `respawn`, `tpplayer <x> <z>` |
+
+The M0 physics playground (`?scene=playground`) uses the fly camera; left click throws a box.
 
 ## Quality gate
 

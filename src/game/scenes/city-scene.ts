@@ -25,9 +25,16 @@ import { ringsFor } from '../../world/streaming/chunk-planner';
 import { ChunkStreamer } from '../../world/streaming/chunk-streamer';
 import { meshFromData } from '../../world/streaming/mesh-upload';
 import { WorkerPool } from '../../world/streaming/worker-pool';
+import { ORBIT } from '../../rendering/camera/orbit-camera';
 import { DebugBoxes } from '../debug-boxes';
 import { showControlHint, type Engine } from '../engine';
 import { CITY_VIEWPOINTS, FLYTHROUGH_PATH } from './city-viewpoints';
+import { setupPlayer, sidewalkSpawn } from './player-setup';
+
+/** On-foot spawn: the downtown sidewalk nearest this point. */
+const SPAWN_NEAR = { x: 560, z: 430 };
+/** The developer obstacle course is placed in open water nearest this point (by the docks). */
+const COURSE_NEAR = { x: -930, z: 760 };
 
 const FOG_COLOR = 0xc3d6e4;
 /** GPU upload volume per frame while streaming (keeps the command buffer from stalling). */
@@ -71,7 +78,7 @@ export async function setupCityScene(engine: Engine, city: CityDef): Promise<voi
   gfx.scene.environmentIntensity = 0.55;
   gfx.scene.fog = new THREE.Fog(FOG_COLOR, gfx.settings.drawDistance * 0.45, gfx.settings.drawDistance);
   gfx.renderer.toneMappingExposure = 0.9;
-  gfx.camera.near = 0.3;
+  gfx.camera.near = ORBIT.near;
   gfx.camera.updateProjectionMatrix();
   gfx.scene.add(new THREE.HemisphereLight(0xd6e6ff, 0x6b6255, 0.6));
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.5);
@@ -249,9 +256,17 @@ export async function setupCityScene(engine: Engine, city: CityDef): Promise<voi
     engine.flyCamera.enabled = false;
     scheduler.addRender(createFlythroughCamera(camera));
   } else {
+    const spawn = sidewalkSpawn(layout, SPAWN_NEAR.x, SPAWN_NEAR.z);
+    setupPlayer(
+      engine,
+      { terrain: model.terrain, layout, waterLevel: city.waterLevel, courseNear: COURSE_NEAR },
+      spawn,
+    );
+    // Stream around the spawn before the first frame (the player camera takes over from here).
+    camera.position.set(spawn.x, spawn.y + 2.5, spawn.z + 4);
     showControlHint(
       engine.root,
-      'Click to look · WASD fly · E/Q up/down · Shift fast · F3 overlay · ` console (try: goto docks)',
+      'Click to play · WASD move · Shift sprint · Z walk · Space jump/climb · C crouch · RMB aim · V camera · Esc menu · ` console',
     );
   }
 
@@ -307,6 +322,7 @@ export async function setupCityScene(engine: Engine, city: CityDef): Promise<voi
       const name = (args[0] ?? '') as keyof typeof CITY_VIEWPOINTS;
       const view = CITY_VIEWPOINTS[name];
       if (!view) throw new CommandError(`Unknown place. Options: ${Object.keys(CITY_VIEWPOINTS).join(', ')}`);
+      if (engine.commands.has('fly') && !engine.flyCamera.enabled) engine.commands.execute('fly on');
       engine.flyCamera.setPose(view.x, view.y, view.z, view.yaw, view.pitch);
       return `Camera at ${name}.`;
     },

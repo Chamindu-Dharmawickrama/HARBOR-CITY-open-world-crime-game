@@ -4,7 +4,7 @@ import type { Entity } from '../../ecs/entity';
 import type { FixedSystem } from '../../ecs/scheduler';
 import { teleport, Transform } from '../../ecs/transform';
 import type { World } from '../../ecs/world';
-import { GROUPS_DYNAMIC_PROP, GROUPS_STATIC_WORLD } from '../../physics/collision-groups';
+import { GROUPS_DYNAMIC_PROP, GROUPS_STATIC_PROP } from '../../physics/collision-groups';
 import type { PhysicsWorld } from '../../physics/physics-world';
 import { RigidBodyRef } from '../../physics/rigid-body-sync';
 import { RenderObject } from '../../rendering/render-sync';
@@ -120,7 +120,7 @@ export class PropManager {
       const desc = rapier.ColliderDesc.cuboid(spec.half[0], spec.half[1], spec.half[2])
         .setTranslation(p.x, p.y + spec.centerY, p.z)
         .setRotation({ x: this.quat.x, y: this.quat.y, z: this.quat.z, w: this.quat.w })
-        .setCollisionGroups(GROUPS_STATIC_WORLD);
+        .setCollisionGroups(GROUPS_STATIC_PROP);
       if (Number.isFinite(spec.knockForce)) {
         desc
           .setActiveEvents(rapier.ActiveEvents.CONTACT_FORCE_EVENTS)

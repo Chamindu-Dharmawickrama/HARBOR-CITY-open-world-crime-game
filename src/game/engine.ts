@@ -33,7 +33,7 @@ import { BenchRecorder, type BenchResult } from './bench';
 import { registerCoreCommands } from './dev-commands';
 import type { UrlParams } from './url-params';
 
-export const GAME_VERSION = '0.2.0-m1';
+export const GAME_VERSION = '0.3.0-m2';
 
 export function readHeapMB(): number | null {
   const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
@@ -69,6 +69,10 @@ export interface Engine {
   /** Extra overlay lines contributed by the active scene. */
   readonly overlayLines: (() => string)[];
   readonly frameHooks: FrameHook[];
+  /** Handles the pause action (the city scene opens its pause menu); default toggles pause. */
+  pauseAction: (() => void) | null;
+  /** True while the developer console has focus. */
+  readonly consoleOpen: boolean;
   setPaused(paused: boolean): void;
   /** Finishes boot: hides the loading screen, starts the loop, announces readiness. */
   start(): void;
@@ -197,7 +201,10 @@ export async function createEngine(root: HTMLElement, params: UrlParams): Promis
     beginFrame: () => {
       frameStart = performance.now();
       input.update();
-      if (input.pressedThisFrame('pause')) setPaused(!loop.isPaused);
+      if (input.pressedThisFrame('pause')) {
+        if (engine.pauseAction) engine.pauseAction();
+        else setPaused(!loop.isPaused);
+      }
     },
     fixedUpdate: (dt) => {
       input.beginFixedStep();
@@ -339,6 +346,10 @@ export async function createEngine(root: HTMLElement, params: UrlParams): Promis
     bench,
     overlayLines,
     frameHooks,
+    pauseAction: null,
+    get consoleOpen() {
+      return devConsole.isOpen;
+    },
     setPaused,
     start: () => {
       loading.hide();

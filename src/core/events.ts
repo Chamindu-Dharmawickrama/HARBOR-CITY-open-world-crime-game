@@ -15,6 +15,13 @@ export interface GameEvents {
   'game:timeScaleChanged': { timeScale: number };
   'settings:qualityChanged': { preset: string };
   'debug:sceneReset': { reason: string };
+  'player:landed': { impactSpeed: number; damage: number };
+  'player:damaged': { amount: number; health: number; armor: number; cause: string };
+  'player:died': { cause: string; x: number; y: number; z: number };
+  'player:respawned': { x: number; y: number; z: number };
+  'player:enteredWater': { x: number; z: number };
+  'menu:opened': { menu: string };
+  'menu:closed': { menu: string };
 }
 
 export type EventHandler<P> = (payload: P) => void;

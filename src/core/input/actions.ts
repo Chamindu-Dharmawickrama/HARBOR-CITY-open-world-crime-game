@@ -3,7 +3,17 @@
  * pressed/held/released. Milestones extend these lists as features land.
  */
 export const AXIS_ACTIONS = ['moveX', 'moveY', 'flyY', 'lookX', 'lookY'] as const;
-export const BUTTON_ACTIONS = ['sprint', 'fire', 'pause'] as const;
+export const BUTTON_ACTIONS = [
+  'sprint',
+  'walk',
+  'jump',
+  'crouch',
+  'aim',
+  'fire',
+  'swapShoulder',
+  'cameraMode',
+  'pause',
+] as const;
 
 export type AxisAction = (typeof AXIS_ACTIONS)[number];
 export type ButtonAction = (typeof BUTTON_ACTIONS)[number];
@@ -16,8 +26,14 @@ export const ACTION_LABELS: Record<InputAction, string> = {
   lookX: 'Look right / left (stick)',
   lookY: 'Look up / down (stick)',
   sprint: 'Sprint / fast',
+  walk: 'Walk (hold)',
+  jump: 'Jump / climb',
+  crouch: 'Crouch (toggle)',
+  aim: 'Aim',
   fire: 'Fire / use',
-  pause: 'Pause',
+  swapShoulder: 'Swap aim shoulder',
+  cameraMode: 'Camera distance',
+  pause: 'Pause / menu',
 };
 
 export function isAxisAction(action: string): action is AxisAction {

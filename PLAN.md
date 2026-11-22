@@ -23,6 +23,11 @@ conventions and current milestone status.
 | Generation determinism | City generation avoids `Math.hypot` (lint-enforced in `world/gen`) and quantises block outlines to 10 µm | Node and Chrome produce byte-identical layouts (verified by the M1 e2e hash test) (M1) |
 | Streaming uploads | Per-frame GPU upload budget in bytes (768 KB) plus compact vertex formats (i8 normals, u8 colours, u16 indices) | Avoids GPU command-buffer stalls when many chunks stream in at once (M1) |
 | Benchmark pacing | `npm run bench` reports uncapped headroom; `--vsync` is the real-world hitch check | Uncapped presentation on Windows saturates the D3D present queue (60–290 ms `Present` stalls in the GPU process) — an artefact absent with vsync (M1) |
+| Character animation | Own pose system: hand-keyed Euler clips (Catmull-Rom) in `src/content/animations.ts`, phase-synced 1D speed blends, frozen-pose crossfades, masked upper-body layer, additive flinch, two-bone foot IK | No art assets, tiny data, deterministic and unit-testable (M2) |
+| Characters | One procedural skinned mesh per character: rounded segments, vertex colours, rigid skinning blended with the parent bone near joints | One draw call per character, no textures (M2) |
+| Character controller | Rapier `KinematicCharacterController`: skin 0.05 m, normal nudge 0.05, autostep 0.42 m, snap-to-ground 0.35 m, zero vertical speed while grounded; own ledge climb from ray probes | Measured in integration tests: no single-frame stalls, kerbs step cleanly (M2) |
+| Third-person camera | Spring arm in `rendering/camera` with an injected sphere-sweep collision interface; snaps in on contact, eases out; ignores props and characters; every frame audited (near-plane overlap + sight lines) | Never clips through walls; testable with Rapier in Node and in the browser (M2) |
+| Settings persistence | Versioned JSON in localStorage (`harbor-city:settings`), validated and clamped on load; corrupt, legacy or newer data falls back to defaults | Rebinding and look settings survive reloads without risking a broken config (M2) |
 
 ## 1. Product summary
 
@@ -403,5 +408,10 @@ updated, commit `M<n>: …`, short report (what works, known-broken, how to hand
 - Generation is verified identical between Node and Chrome; other engines (Firefox, Safari) are not formally guaranteed identical transcendental Math results, so a city there could differ in rare details for the same seed.
 - Bridges and the tunnel are always resident (not streamed); shop signs and billboards (~400) are all drawn by one instanced mesh.
 - Street lamps glow at night (`night` console command) but do not light the ground until the M8 lighting pass.
+- Foot IK corrects ankle height on kerbs, steps and slopes; feet do not tilt to match a slope.
+- Ledge climbing covers 0.45–1.85 m on land (up to 4.6 m when pulling out of water); no ladders or vaults.
+- Until weapons arrive in M5, aiming shows an unarmed guard stance with the over-the-shoulder camera; the punch clip is authored but melee hits come with combat.
+- The pause menu is mouse-driven: on a gamepad, Start opens and closes it, but the controls page has no pad navigation yet (menus are reworked in M10).
+- The developer obstacle course (`course` command) is a test fixture floating in open water near the docks, not part of the city.
 
 (Updated as the build goes.)
