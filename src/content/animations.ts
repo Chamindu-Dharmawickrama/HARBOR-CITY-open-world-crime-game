@@ -804,7 +804,64 @@ const die: ClipDef = {
   ],
 };
 
+/** Seated at a steering wheel (hips at seat height; root is the seat). */
+const sitDrive: ClipDef = {
+  name: 'sitDrive',
+  duration: 3,
+  loop: true,
+  tracks: {
+    spine: [[0, -8, 0, 0]],
+    chest: [
+      [0, 2, 0, 0],
+      [0.5, 3, 0, 0],
+    ],
+    neck: [[0, 4, 0, 0]],
+    head: [
+      [0, 2, -3, 0],
+      [0.5, 2, 3, 0],
+    ],
+    upperArmL: [[0, -52, 0, 14]],
+    lowerArmL: [[0, -42, 0, 0]],
+    upperArmR: [[0, -52, 0, -14]],
+    lowerArmR: [[0, -42, 0, 0]],
+    upperLegL: [[0, -82, 0, 6]],
+    lowerLegL: [[0, 72, 0, 0]],
+    footL: [[0, -8, 0, 0]],
+    upperLegR: [[0, -82, 0, -6]],
+    lowerLegR: [[0, 72, 0, 0]],
+    footR: [[0, -8, 0, 0]],
+  },
+  // Root on the cabin floor; hips drop onto the seat cushion ≈ 0.3 m above it.
+  hips: [[0, 0, -0.67, -0.12]],
+};
+
+/** Astride a motorbike, leaning onto the bars. */
+const sitRide: ClipDef = {
+  name: 'sitRide',
+  duration: 3,
+  loop: true,
+  tracks: {
+    spine: [[0, 26, 0, 0]],
+    chest: [[0, 10, 0, 0]],
+    neck: [[0, -22, 0, 0]],
+    head: [[0, -10, 0, 0]],
+    upperArmL: [[0, -58, 0, 16]],
+    lowerArmL: [[0, -30, 0, 0]],
+    upperArmR: [[0, -58, 0, -16]],
+    lowerArmR: [[0, -30, 0, 0]],
+    upperLegL: [[0, -58, 0, 18]],
+    lowerLegL: [[0, 88, 0, 0]],
+    footL: [[0, -10, 0, 0]],
+    upperLegR: [[0, -58, 0, -18]],
+    lowerLegR: [[0, 88, 0, 0]],
+    footR: [[0, -10, 0, 0]],
+  },
+  hips: [[0, 0, -0.42, -0.08]],
+};
+
 export const ANIMATION_CLIPS: readonly ClipDef[] = [
+  sitDrive,
+  sitRide,
   idle,
   walk,
   run,

@@ -1,3 +1,4 @@
+import type { RigidBody } from '@dimforge/rapier3d-compat';
 import { Group, GROUPS_CAMERA_QUERY, interactionGroups } from '../../physics/collision-groups';
 import { createRayHit, type PhysicsWorld } from '../../physics/physics-world';
 import type { CameraCollision } from '../../rendering/camera/orbit-camera';
@@ -18,11 +19,14 @@ export function createGroundQuery(physics: PhysicsWorld): GroundQuery {
 
 /** Camera boom sweeps: buildings, ground, landmarks and vehicles (props and people are ignored). */
 export function createCameraCollision(physics: PhysicsWorld): CameraCollision {
-  return {
+  const collision: CameraCollision = {
+    ignore: null,
     sweep(ox, oy, oz, dx, dy, dz, radius, maxDistance) {
-      return physics.castSphere(ox, oy, oz, dx, dy, dz, radius, maxDistance, GROUPS_CAMERA_QUERY);
+      const body = (collision.ignore as RigidBody | null) ?? undefined;
+      return physics.castSphere(ox, oy, oz, dx, dy, dz, radius, maxDistance, GROUPS_CAMERA_QUERY, body);
     },
   };
+  return collision;
 }
 
 /** Why a camera frame counts as clipped (0 = clear). */

@@ -3,6 +3,8 @@ import { clamp, damp, dampAngle, stepCriticalSpring, type SpringState } from '..
 
 /** Sphere sweeps against the world (injected, so rendering stays independent of physics). */
 export interface CameraCollision {
+  /** A physics body to ignore (the vehicle the camera is following), or null. */
+  ignore: unknown;
   /** Free distance for a sphere of `radius` moved from the origin along the unit direction. */
   sweep(
     ox: number,

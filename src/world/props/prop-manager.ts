@@ -56,6 +56,13 @@ export class PropManager {
       vertices += g.getAttribute('position').count;
       indices += g.index?.count ?? 0;
     }
+    // Hard hits on knockable props are queued here and processed by the propKnock system.
+    physics.onContactForce((h1, h2, magnitude) => {
+      const id = this.propByHandle.get(h1) ?? this.propByHandle.get(h2);
+      if (id === undefined) return;
+      const spec = PROP_PHYSICS[this.props[id].type];
+      if (spec && magnitude >= spec.knockForce) this.pendingKnocks.push(id);
+    });
     this.mesh = new THREE.BatchedMesh(Math.max(1, props.length), vertices, indices, material);
     this.mesh.perObjectFrustumCulled = true;
     this.mesh.sortObjects = false;
@@ -201,12 +208,6 @@ export class PropManager {
       phase: 'postPhysics',
       fixedUpdate: (ctx): void => {
         this.simTime = ctx.time;
-        this.physics.drainContactForces((h1, h2, magnitude) => {
-          const id = this.propByHandle.get(h1) ?? this.propByHandle.get(h2);
-          if (id === undefined) return;
-          const spec = PROP_PHYSICS[this.props[id].type];
-          if (spec && magnitude >= spec.knockForce) this.pendingKnocks.push(id);
-        });
         while (this.pendingKnocks.length > 0) this.knock(this.pendingKnocks.pop() as number);
         while (this.debris.length > 0 && ctx.time - this.debris[0].bornAt > DEBRIS_LIFETIME) {
           this.despawn(this.debris.shift() as Debris);

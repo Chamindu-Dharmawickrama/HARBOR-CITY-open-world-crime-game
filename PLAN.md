@@ -28,6 +28,11 @@ conventions and current milestone status.
 | Character controller | Rapier `KinematicCharacterController`: skin 0.05 m, normal nudge 0.05, autostep 0.42 m, snap-to-ground 0.35 m, zero vertical speed while grounded; own ledge climb from ray probes | Measured in integration tests: no single-frame stalls, kerbs step cleanly (M2) |
 | Third-person camera | Spring arm in `rendering/camera` with an injected sphere-sweep collision interface; snaps in on contact, eases out; ignores props and characters; every frame audited (near-plane overlap + sight lines) | Never clips through walls; testable with Rapier in Node and in the browser (M2) |
 | Settings persistence | Versioned JSON in localStorage (`harbor-city:settings`), validated and clamped on load; corrupt, legacy or newer data falls back to defaults | Rebinding and look settings survive reloads without risking a broken config (M2) |
+| Vehicle integration | Implicit wheel-spin integration in 4 substeps (tire slope linearised per substep); brakes inside the implicit solve | Stable at 60 Hz for light cars and 11 t buses alike; no ABS chatter (M3) |
+| Two-wheelers | Physics holds the bike upright (stiff roll PD); lean is visual from v·yaw-rate/g; wheelie/stoppie control | A leaning rigid body slides its contact patches and weaves at speed; this rides predictably (M3) |
+| Vehicle rendering | One skinned mesh per vehicle (paint/glass/lights groups, bones for doors/wheels/fork); lamp states via per-vehicle uniforms | ~3 draw calls per car, no textures; dents copy the geometry on write (M3) |
+| Crash damage | Contact-force listener → per-vehicle crash window (only a harder hit adds damage), per-crash cap, spawn grace | One crash never wrecks a car outright; spawn overlaps are not crashes (M3) |
+| Handling targets | Plan targets for cars; heavy classes get realistic skidpad ranges (bus 0.6–0.85 g, trucks 0.6–0.95 g) | A bus at 0.8 g would tip; every range is asserted by the harness (M3) |
 
 ## 1. Product summary
 
@@ -413,5 +418,13 @@ updated, commit `M<n>: …`, short report (what works, known-broken, how to hand
 - Until weapons arrive in M5, aiming shows an unarmed guard stance with the over-the-shoulder camera; the punch clip is authored but melee hits come with combat.
 - The pause menu is mouse-driven: on a gamepad, Start opens and closes it, but the controls page has no pad navigation yet (menus are reworked in M10).
 - The developer obstacle course (`course` command) is a test fixture floating in open water near the docks, not part of the city.
+- Glass damage is per vehicle (intact → cracked → shattered), not per window.
+- Motorbikes lean visually; the physics body stays upright. Riders are thrown off in big crashes but there is no ragdoll until M5.
+- Boats: flat water in physics (no waves, no planing lift); boarding works from the water or right beside the hull.
+- Curb parking uses the outer metre of wide (9 m) streets; M4 traffic lanes must keep clear of that strip.
+- NPC drivers of parked cars sit still with the engine running until the M4 traffic AI drives them.
+- The horn/siren key toggles light bars and raises a `vehicle:horn` event; all vehicle sound arrives with M9.
+- The manual gearbox (E/Q) is switched on with the `gearbox` console command until the M10 settings menu.
+- Wheels can be torn off cars, not bikes; torn-off wheels are loose debris for 30 s.
 
 (Updated as the build goes.)

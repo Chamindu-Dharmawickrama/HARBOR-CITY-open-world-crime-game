@@ -57,6 +57,13 @@ export class CharacterView {
     this.yaw = yaw;
   }
 
+  /** Full orientation (seated in a pitching/rolling vehicle). */
+  setTransformQuat(x: number, y: number, z: number, q: THREE.Quaternion): void {
+    this.root.position.set(x, y, z);
+    this.root.quaternion.copy(q);
+    this.yaw = 2 * Math.atan2(q.y, q.w);
+  }
+
   setVisible(visible: boolean): void {
     this.root.visible = visible;
   }

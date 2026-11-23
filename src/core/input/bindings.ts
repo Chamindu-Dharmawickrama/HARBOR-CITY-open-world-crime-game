@@ -1,4 +1,4 @@
-import { AXIS_ACTIONS, BUTTON_ACTIONS, type InputAction } from './actions';
+import { actionsConflict, AXIS_ACTIONS, BUTTON_ACTIONS, type InputAction } from './actions';
 
 /**
  * A binding maps one physical control to an action. For axis actions, `scale` gives the
@@ -33,6 +33,14 @@ export const DEFAULT_BINDINGS: BindingMap = {
   swapShoulder: [key('KeyX'), padButton(11)],
   cameraMode: [key('KeyV'), padButton(8)],
   pause: [key('KeyP'), key('Escape'), padButton(9)],
+  throttle: [key('KeyW'), key('ArrowUp'), padButton(7)],
+  brake: [key('KeyS'), key('ArrowDown'), padButton(6)],
+  steer: [key('KeyD'), key('KeyA', -1), key('ArrowRight'), key('ArrowLeft', -1), padAxis(0)],
+  interact: [key('KeyF'), key('Enter'), padButton(3)],
+  handbrake: [key('Space'), padButton(5)],
+  horn: [key('KeyH'), padButton(10)],
+  gearUp: [key('KeyE'), padButton(1)],
+  gearDown: [key('KeyQ'), padButton(2)],
 };
 
 export function cloneBindings(map: BindingMap): BindingMap {
@@ -59,15 +67,16 @@ export function bindingsEqual(a: Binding, b: Binding): boolean {
 
 /**
  * Returns a new map where slot `slot` of `action` is replaced by `binding` (or appended if
- * slot === length). The same physical control is removed from every other action and from the
- * action's other slots, so one key never triggers two actions (or both halves of an axis).
+ * slot === length). The same physical control is removed from every action that can be live at
+ * the same time (see `actionsConflict`) and from the action's other slots, so one key never
+ * triggers two things at once (or both halves of an axis).
  */
 export function rebind(map: BindingMap, action: InputAction, slot: number, binding: Binding): BindingMap {
   const next = cloneBindings(map);
   const own = next[action];
   if (slot < 0 || slot > own.length) throw new Error(`rebind: slot ${slot} out of range for ${action}`);
   for (const other of [...AXIS_ACTIONS, ...BUTTON_ACTIONS]) {
-    if (other === action) continue;
+    if (other === action || !actionsConflict(action, other)) continue;
     next[other] = next[other].filter((b) => !bindingsEqual(b, binding));
   }
   const list: Binding[] = [];

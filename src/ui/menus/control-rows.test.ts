@@ -12,8 +12,10 @@ const row = (action: ControlRow['action'], sign: 1 | -1 = 1): ControlRow => {
 describe('controls panel rows', () => {
   it('covers every action (axes in both directions)', () => {
     for (const action of BUTTON_ACTIONS) expect(CONTROL_ROWS.some((r) => r.action === action)).toBe(true);
+    // Pedals (throttle, brake) are one-directional; every other axis has a row per direction.
     for (const action of AXIS_ACTIONS) {
       expect(CONTROL_ROWS.some((r) => r.action === action && r.sign === 1)).toBe(true);
+      if (action === 'throttle' || action === 'brake') continue;
       expect(CONTROL_ROWS.some((r) => r.action === action && r.sign === -1)).toBe(true);
     }
   });
@@ -62,6 +64,14 @@ describe('controls panel rows', () => {
     const map = clearSlot(DEFAULT_BINDINGS, row('jump'), 'kbm', 0);
     expect(map.jump.some((b) => b.kind === 'key')).toBe(false);
     expect(clearSlot(map, row('jump'), 'kbm', 1)).toBe(map);
+  });
+
+  it('a key may drive on foot and in a vehicle, but not two things in one context', () => {
+    // W is both "move forward" and "accelerate" by default; binding W to jump strips it from
+    // movement (same context) but leaves the vehicle throttle alone.
+    const map = assignSlot(DEFAULT_BINDINGS, row('jump'), 'kbm', 0, { kind: 'key', code: 'KeyW' });
+    expect(map.moveY.some((b) => b.kind === 'key' && b.code === 'KeyW')).toBe(false);
+    expect(map.throttle.some((b) => b.kind === 'key' && b.code === 'KeyW')).toBe(true);
   });
 
   it('rebind de-duplicates within the action itself', () => {

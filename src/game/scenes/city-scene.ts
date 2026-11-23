@@ -29,7 +29,9 @@ import { ORBIT } from '../../rendering/camera/orbit-camera';
 import { DebugBoxes } from '../debug-boxes';
 import { showControlHint, type Engine } from '../engine';
 import { CITY_VIEWPOINTS, FLYTHROUGH_PATH } from './city-viewpoints';
-import { setupPlayer, sidewalkSpawn } from './player-setup';
+import { generateParkingSpots } from '../../world/gen/parking';
+import { createWaterTest, setupPlayer, sidewalkSpawn } from './player-setup';
+import { setupDriving, setupVehicles } from './vehicle-setup';
 
 /** On-foot spawn: the downtown sidewalk nearest this point. */
 const SPAWN_NEAR = { x: 560, z: 430 };
@@ -252,21 +254,36 @@ export async function setupCityScene(engine: Engine, city: CityDef): Promise<voi
   const start = CITY_VIEWPOINTS.downtown;
   engine.flyCamera.setPose(start.x, start.y, start.z, start.yaw, start.pitch);
   engine.flyCamera.baseSpeed = 30;
+  // Vehicles (parked cars follow the streaming centre — also during the benchmark).
+  const parkingSpots = generateParkingSpots(layout, model.terrain);
+  const vehicleWorld = setupVehicles(
+    engine,
+    { waterLevel: city.waterLevel, isWater: createWaterTest(model.terrain, layout) },
+    parkingSpots,
+    () => camera.position,
+  );
+  probes.register('parking', () => ({
+    spots: parkingSpots.length,
+    lot: parkingSpots.filter((s) => s.kind === 'lot').length,
+    curb: parkingSpots.filter((s) => s.kind === 'curb').length,
+    boat: parkingSpots.filter((s) => s.kind === 'boat').length,
+  }));
   if (params.bench === 'flythrough') {
     engine.flyCamera.enabled = false;
     scheduler.addRender(createFlythroughCamera(camera));
   } else {
     const spawn = sidewalkSpawn(layout, SPAWN_NEAR.x, SPAWN_NEAR.z);
-    setupPlayer(
+    const playerHandle = setupPlayer(
       engine,
       { terrain: model.terrain, layout, waterLevel: city.waterLevel, courseNear: COURSE_NEAR },
       spawn,
     );
+    setupDriving(engine, vehicleWorld, playerHandle);
     // Stream around the spawn before the first frame (the player camera takes over from here).
     camera.position.set(spawn.x, spawn.y + 2.5, spawn.z + 4);
     showControlHint(
       engine.root,
-      'Click to play · WASD move · Shift sprint · Z walk · Space jump/climb · C crouch · RMB aim · V camera · Esc menu · ` console',
+      'Click to play · WASD move · Shift sprint · Space jump/climb · C crouch · RMB aim · F enter car · V camera · Esc menu · ` console',
     );
   }
 

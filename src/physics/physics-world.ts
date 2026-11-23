@@ -27,6 +27,9 @@ export function createRayHit(): RayHit {
   return { hit: false, distance: 0, x: 0, y: 0, z: 0, nx: 0, ny: 1, nz: 0, collider: null };
 }
 
+/** Contact-force event: collider handles and total force magnitude (N). */
+export type ContactForceListener = (collider1: number, collider2: number, magnitude: number) => void;
+
 export interface BoxBodyOptions {
   halfExtents: readonly [number, number, number];
   position: readonly [number, number, number];
@@ -60,20 +63,31 @@ export class PhysicsWorld {
     this.events = new rapier.EventQueue(true);
   }
 
-  /** Advances one fixed step. Events from the previous step that nobody drained are dropped. */
+  private readonly contactListeners: ContactForceListener[] = [];
+
+  /** Advances one fixed step and dispatches its contact-force events to every listener. */
   step(): void {
     this.events.clear();
     this.world.step(this.events);
+    if (this.contactListeners.length === 0) return;
+    this.events.drainContactForceEvents((event) => {
+      const h1 = event.collider1();
+      const h2 = event.collider2();
+      const magnitude = event.totalForceMagnitude();
+      for (const listener of this.contactListeners) listener(h1, h2, magnitude);
+    });
   }
 
   /**
-   * Reports contact-force events from the last step (only colliders created with
-   * CONTACT_FORCE_EVENTS and a force threshold produce them).
+   * Subscribes to contact-force events (only colliders created with CONTACT_FORCE_EVENTS and a
+   * force threshold produce them). Listeners run right after each step; returns an unsubscribe.
    */
-  drainContactForces(handler: (collider1: number, collider2: number, magnitude: number) => void): void {
-    this.events.drainContactForceEvents((event) =>
-      handler(event.collider1(), event.collider2(), event.totalForceMagnitude()),
-    );
+  onContactForce(listener: ContactForceListener): () => void {
+    this.contactListeners.push(listener);
+    return () => {
+      const i = this.contactListeners.indexOf(listener);
+      if (i >= 0) this.contactListeners.splice(i, 1);
+    };
   }
 
   get bodyCount(): number {

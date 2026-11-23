@@ -22,11 +22,24 @@ export const COURSE_SPOTS = [
   'water',
   'ceiling',
   'wallwalk',
+  'pad',
+  'barrier',
+  'mooring',
 ] as const;
 export type CourseSpotName = (typeof COURSE_SPOTS)[number];
 
 const WIDTH = 44;
 const DEPTH = 32;
+/** Driving pad beside the deck (same height): x ∈ [PAD_X0, PAD_X1], z ∈ [PAD_Z0, PAD_Z1]. */
+const PAD_X0 = 50;
+const PAD_X1 = 250;
+const PAD_Z0 = -44;
+const PAD_Z1 = 76;
+/** Whole footprint (deck + pad) for the open-water search. */
+const FOOT_X0 = 0;
+const FOOT_X1 = PAD_X1;
+const FOOT_Z0 = PAD_Z0;
+const FOOT_Z1 = PAD_Z1;
 const DECK_HEIGHT = 1.2;
 
 interface Block {
@@ -40,6 +53,8 @@ const HAZARD = 0xc9a227;
 const TOWER = 0x6f7f8f;
 const ROOF = 0xb5523b;
 const WALL = 0xb9b2a4;
+const ASPHALT = 0x3a3d42;
+const BARRIER = 0xd0cfc8;
 
 /** Course layout in local metres (x ∈ [0, 44], z ∈ [0, 32]; y relative to the deck top). */
 function blocks(): Block[] {
@@ -68,13 +83,17 @@ function blocks(): Block[] {
     b(3, 1.3, 6, 9, 1.7, 14, ROOF),
     b(14, 0, 10, 24, 8, 11, WALL), // tall wall + corner for camera-collision checks
     b(24, 0, 10, 25, 8, 18, WALL),
+    b(44, -4.2, 8, PAD_X0, 0, 24, DECK), // bridge deck → pad
+    b(PAD_X0, -4.2, PAD_Z0, PAD_X1, 0, PAD_Z1, ASPHALT), // driving pad
+    b(200, 0, -10, 201.2, 1.1, 30, BARRIER), // crash barrier
   ];
 }
 
 /**
  * Developer obstacle course on a pontoon in open water near the docks: walls to climb (and one
  * too high), a kerb, 10 m and 30 m towers for fall damage, a low tunnel for crouching, tall walls
- * for camera-collision checks, and water all around for swimming and climbing out.
+ * for camera-collision checks, water all around for swimming and climbing out, and a 200 × 120 m
+ * driving pad with a crash barrier and a jump ramp for vehicle testing.
  */
 export class TestCourse {
   readonly deckY: number;
@@ -104,6 +123,32 @@ export class TestCourse {
       const geometry = new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2).translate(cx, cy, cz);
       geometry.deleteAttribute('uv');
       colour.setHex(block.colour, THREE.SRGBColorSpace);
+      const count = geometry.getAttribute('position').count;
+      const colours = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) colours.set([colour.r, colour.g, colour.b], i * 3);
+      geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+      parts.push(geometry);
+    }
+    // Jump ramp: 14 m long, rising to 1.6 m, facing +X.
+    {
+      const length = 14;
+      const rise = 1.6;
+      const angle = Math.atan2(rise, length);
+      const slope = Math.hypot(length, rise);
+      const cx = originX + 125;
+      const cy = this.deckY + rise / 2 - 0.15;
+      const cz = originZ + 54;
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
+      this.colliders.push(
+        physics.createFixedBox({
+          halfExtents: [slope / 2, 0.15, 4],
+          position: [cx, cy, cz],
+          rotation: [q.x, q.y, q.z, q.w],
+        }),
+      );
+      const geometry = new THREE.BoxGeometry(slope, 0.3, 8).applyQuaternion(q).translate(cx, cy, cz);
+      geometry.deleteAttribute('uv');
+      colour.setHex(HAZARD, THREE.SRGBColorSpace);
       const count = geometry.getAttribute('position').count;
       const colours = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) colours.set([colour.r, colour.g, colour.b], i * 3);
@@ -147,6 +192,15 @@ export class TestCourse {
         return { x: x + 6, y, z: z + 17, yaw: Math.PI };
       case 'wallwalk':
         return { x: x + 13, y, z: z + 12.2, yaw: Math.PI / 2 };
+      case 'pad':
+        // West end of the driving pad, facing east (+X) down its length.
+        return { x: x + PAD_X0 + 12, y, z: z + 16, yaw: Math.PI / 2 };
+      case 'barrier':
+        // 60 m short of the crash barrier, facing it.
+        return { x: x + 140, y, z: z + 10, yaw: Math.PI / 2 };
+      case 'mooring':
+        // In the water off the deck's south side (boats).
+        return { x: x + 22, y: y - DECK_HEIGHT, z: z - 10, yaw: Math.PI / 2 };
     }
   }
 
@@ -169,14 +223,14 @@ export function findOpenWater(
 ): { x: number; z: number } {
   const margin = 14;
   const clear = (ox: number, oz: number): boolean => {
-    for (let px = ox - margin; px <= ox + WIDTH + margin; px += 4) {
-      for (let pz = oz - margin; pz <= oz + DEPTH + margin; pz += 4) {
+    for (let px = ox + FOOT_X0 - margin; px <= ox + FOOT_X1 + margin; px += 4) {
+      for (let pz = oz + FOOT_Z0 - margin; pz <= oz + FOOT_Z1 + margin; pz += 4) {
         if (terrain.isLand(px, pz)) return false;
       }
     }
     for (const k of keepOut) {
-      const cx = Math.max(ox - margin, Math.min(k.x, ox + WIDTH + margin));
-      const cz = Math.max(oz - margin, Math.min(k.z, oz + DEPTH + margin));
+      const cx = Math.max(ox + FOOT_X0 - margin, Math.min(k.x, ox + FOOT_X1 + margin));
+      const cz = Math.max(oz + FOOT_Z0 - margin, Math.min(k.z, oz + FOOT_Z1 + margin));
       if ((cx - k.x) ** 2 + (cz - k.z) ** 2 < k.radius * k.radius) return false;
     }
     return true;
@@ -185,8 +239,8 @@ export function findOpenWater(
     const steps = Math.max(1, Math.round((2 * Math.PI * r) / 40));
     for (let i = 0; i < steps; i++) {
       const a = (i / steps) * Math.PI * 2;
-      const ox = x + Math.cos(a) * r - WIDTH / 2;
-      const oz = z + Math.sin(a) * r - DEPTH / 2;
+      const ox = x + Math.cos(a) * r - (FOOT_X0 + FOOT_X1) / 2;
+      const oz = z + Math.sin(a) * r - (FOOT_Z0 + FOOT_Z1) / 2;
       if (clear(ox, oz)) return { x: ox, z: oz };
     }
   }

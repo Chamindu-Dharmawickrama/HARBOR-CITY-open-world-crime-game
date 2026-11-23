@@ -4,7 +4,7 @@ import { Blend1D } from './blend-1d';
 import type { Clip, ClipLibrary } from './clip';
 import { addPose, blendPoses, boneMask, Pose } from './pose';
 
-export type AnimState = 'locomotion' | 'crouch' | 'air' | 'climb' | 'swim' | 'dead';
+export type AnimState = 'locomotion' | 'crouch' | 'air' | 'climb' | 'swim' | 'dead' | 'seated';
 
 /** What the animation needs to know about the character each frame. */
 export interface AnimatorInput {
@@ -20,6 +20,9 @@ export interface AnimatorInput {
   aimPitch: number;
   /** Head look yaw relative to the body, radians (+ = left). */
   lookYaw: number;
+  /** Seated in a vehicle: the clip to hold (overrides the motor mode), and steering −1..1. */
+  seatedClip: 'sitDrive' | 'sitRide' | null;
+  steer: number;
 }
 
 export const REQUIRED_CLIPS = [
@@ -39,6 +42,8 @@ export const REQUIRED_CLIPS = [
   'punch',
   'hit',
   'die',
+  'sitDrive',
+  'sitRide',
 ] as const;
 
 /** Crossfade time into each state (seconds). */
@@ -49,6 +54,7 @@ const FADE_IN: Record<AnimState, number> = {
   climb: 0.1,
   swim: 0.35,
   dead: 0.12,
+  seated: 0.25,
 };
 
 const UPPER_MASK = boneMask(UPPER_BODY_BONES);
@@ -64,6 +70,8 @@ export function emptyAnimatorInput(): AnimatorInput {
     aiming: false,
     aimPitch: 0,
     lookYaw: 0,
+    seatedClip: null,
+    steer: 0,
   };
 }
 
@@ -224,6 +232,7 @@ export class Animator {
   }
 
   private stateFor(input: AnimatorInput): AnimState {
+    if (input.seatedClip) return 'seated';
     switch (input.mode) {
       case 'dead':
         return 'dead';
@@ -264,6 +273,16 @@ export class Animator {
       case 'dead':
         c.die.sample(this.stateTime, out);
         return;
+      case 'seated': {
+        (input.seatedClip === 'sitRide' ? c.sitRide : c.sitDrive).sample(this.stateTime, out);
+        // Hands follow the steering: shoulders turn with the wheel, the head looks into the turn.
+        const steer = Math.max(-1, Math.min(1, input.steer));
+        out.addEuler(BONE_INDEX.chest, 0, -steer * 8, 0);
+        out.addEuler(BONE_INDEX.upperArmL, steer * 12, 0, 0);
+        out.addEuler(BONE_INDEX.upperArmR, -steer * 12, 0, 0);
+        out.addEuler(BONE_INDEX.head, 0, -steer * 12, 0);
+        return;
+      }
     }
   }
 }

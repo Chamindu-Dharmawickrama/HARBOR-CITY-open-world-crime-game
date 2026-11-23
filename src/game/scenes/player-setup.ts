@@ -36,13 +36,23 @@ export interface PlayerSceneContext {
 export interface PlayerHandle {
   readonly player: PlayerCharacter;
   readonly camera: PlayerCameraSystem;
+  readonly presentation: PlayerPresentation;
   readonly spawn: CourseSpot;
+  /** Builds the obstacle course on first use and returns it. */
+  readonly course: () => TestCourse;
+  /** Teleports the player (on foot) to a spot. */
+  readonly placePlayer: (spot: CourseSpot) => void;
+  /** Whether the debug fly camera is active. */
+  readonly flying: () => boolean;
 }
 
 const DEATH_LINES: Record<string, string> = {
   fall: 'Gravity always wins.',
   fell: 'Lost to the deep.',
   debug: 'Taken out by the developer console.',
+  explosion: 'Too close to the fireworks.',
+  bail: 'The road won.',
+  thrown: 'Over the handlebars.',
 };
 
 /**
@@ -436,5 +446,13 @@ export function setupPlayer(engine: Engine, ctx: PlayerSceneContext, spawn: Cour
     return `player ${m.mode}${m.crouched ? ' crouched' : ''} ${m.speed.toFixed(1)} m/s  hp ${player.vitals.health.toFixed(0)}  stamina ${player.vitals.stamina.toFixed(0)}  anim ${presentation.animator.state}  cam ${cam.orbit.distance.toFixed(2)} m${cam.orbit.blocked ? ' (blocked)' : ''}`;
   });
 
-  return { player, camera: cam, spawn };
+  return {
+    player,
+    camera: cam,
+    presentation,
+    spawn,
+    course: ensureCourse,
+    placePlayer,
+    flying: () => flying,
+  };
 }

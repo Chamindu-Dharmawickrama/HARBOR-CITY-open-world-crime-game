@@ -94,6 +94,18 @@ export class PlayerCharacter {
   deaths = 0;
   /** True until the pending placement found ground. */
   placing = false;
+  /**
+   * Seated in a vehicle: the motor's collider is off and it does not move by itself (the vehicle
+   * system keeps it at the seat). Survival rules (death, respawn) still apply.
+   */
+  seated = false;
+  /**
+   * Scripted walking (e.g. to a car door): replaces player movement input while set. World-space
+   * direction × magnitude, speed, and an optional facing.
+   */
+  autoMove: { x: number; z: number; speed: MoveSpeed; faceYaw: number | null } | null = null;
+  /** Tumbling after a bail-out or being thrown off a bike: no control until it lands. */
+  stunned = 0;
   private placement: Placement | null = null;
   private lastLandings = 0;
   private lastWaterEntries = 0;
@@ -124,6 +136,8 @@ export class PlayerCharacter {
    * (streaming may still be loading it). Open water counts as a surface.
    */
   placeAt(x: number, z: number, fromY: number, yaw: number | null = null): void {
+    // Teleporting out of a vehicle: leave the seat first (the vehicle layer notices).
+    if (this.seated) this.stand(x, fromY, z, yaw ?? this.motor.yaw);
     this.placement = { x, z, fromY, yaw, waited: 0 };
     this.placing = true;
     this.motor.teleport(x, fromY, z);
@@ -155,7 +169,35 @@ export class PlayerCharacter {
     this.bus.emit('player:died', { cause, x: p.x, y: p.y, z: p.z });
   }
 
+  /** Climbs into a vehicle seat (collider off, no self-movement). */
+  sit(): void {
+    this.seated = true;
+    this.aiming = false;
+    this.autoMove = null;
+    this.motor.collider.setEnabled(false);
+    this.motor.velocity.x = 0;
+    this.motor.velocity.y = 0;
+    this.motor.velocity.z = 0;
+  }
+
+  /** Gets out at (x, y, z) facing yaw, optionally flung with a velocity (bail-out, crash). */
+  stand(x: number, y: number, z: number, yaw: number, vx = 0, vy = 0, vz = 0): void {
+    this.seated = false;
+    this.motor.collider.setEnabled(true);
+    this.motor.teleport(x, y, z);
+    this.motor.yaw = yaw;
+    this.motor.velocity.x = vx;
+    this.motor.velocity.y = vy;
+    this.motor.velocity.z = vz;
+    if (vx * vx + vz * vz > 9) {
+      this.motor.mode = 'air';
+      this.stunned = 0.6;
+    }
+    this.lastLandings = this.motor.landings;
+  }
+
   respawn(): void {
+    if (this.seated) this.stand(0, 0, 0, 0);
     const at = this.respawnPoint();
     revive(this.vitals);
     this.dead = false;
@@ -170,6 +212,15 @@ export class PlayerCharacter {
     if (this.placing) {
       this.tryPlace(dt);
       if (this.placing) return;
+    }
+    if (this.seated) {
+      // The vehicle carries us; only the death timer runs here.
+      if (this.dead) {
+        this.deadTime += dt;
+        if (this.deadTime >= PLAYER.respawnDelay) this.respawn();
+      }
+      updateStamina(this.vitals, dt, 0);
+      return;
     }
     const motor = this.motor;
     const cmd = this.cmd;
@@ -187,6 +238,16 @@ export class PlayerCharacter {
         this.respawn();
         return;
       }
+    } else if (this.autoMove) {
+      const a = this.autoMove;
+      cmd.moveX = a.x;
+      cmd.moveZ = a.z;
+      cmd.speed = a.speed;
+      cmd.faceYaw = a.faceYaw;
+      this.aiming = false;
+    } else if (this.stunned > 0) {
+      this.stunned = this.motor.grounded ? this.stunned - dt : this.stunned;
+      this.aiming = false;
     } else if (this.controlsEnabled) {
       cameraRelativeMove(input.axis('moveX'), input.axis('moveY'), this.view.yaw, this.move);
       cmd.moveX = this.move.x;

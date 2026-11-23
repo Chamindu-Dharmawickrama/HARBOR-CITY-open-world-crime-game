@@ -20,6 +20,15 @@ export interface GameEvents {
   'player:died': { cause: string; x: number; y: number; z: number };
   'player:respawned': { x: number; y: number; z: number };
   'player:enteredWater': { x: number; z: number };
+  'vehicle:entered': { vehicle: number; model: string; jacked: boolean };
+  'vehicle:exited': { vehicle: number; bailed: boolean };
+  'vehicle:windowSmashed': { vehicle: number; x: number; y: number; z: number };
+  'vehicle:hotwired': { vehicle: number };
+  'vehicle:impact': { vehicle: number; force: number; x: number; y: number; z: number };
+  'vehicle:damaged': { vehicle: number; engineHealth: number; amount: number };
+  'vehicle:onFire': { vehicle: number };
+  'vehicle:exploded': { vehicle: number; x: number; y: number; z: number };
+  'vehicle:horn': { vehicle: number; siren: boolean };
   'menu:opened': { menu: string };
   'menu:closed': { menu: string };
 }

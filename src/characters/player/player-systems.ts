@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { Vec2Out } from '../../core/input/deadzone';
 import type { InputSystem } from '../../core/input/input-system';
 import { clamp, dampAngle, wrapAngle } from '../../core/math';
@@ -35,6 +35,26 @@ export function createPlayerFixedSystem(player: PlayerCharacter, world: World, e
   };
 }
 
+/**
+ * Seat placement while getting in, sitting in and getting out of a vehicle (filled in by the
+ * vehicle layer). The character is placed in `anchor`'s frame, blending from the door stand
+ * point (blend 0) to the seat (blend 1).
+ */
+export interface SeatOverride {
+  anchor: THREE.Object3D;
+  seat: THREE.Vector3;
+  door: THREE.Vector3;
+  blend: number;
+  clip: 'sitDrive' | 'sitRide';
+  steer: number;
+  /** Interior camera: hide the body. */
+  hidden: boolean;
+}
+
+const seatLocal = new THREE.Vector3();
+const seatWorld = new THREE.Vector3();
+const seatQuat = new THREE.Quaternion();
+
 /** Yaw (0 = +Z) from an interpolated rotation about Y. */
 function yawOf(pose: PoseOut): number {
   return 2 * Math.atan2(pose.qy, pose.qw);
@@ -60,6 +80,8 @@ export class PlayerPresentation implements RenderSystem {
   private headYaw = 0;
   /** Set by the camera system: hide the body when the camera is pressed into it. */
   cameraTooClose = false;
+  /** Set by the vehicle layer while getting in / riding / getting out. */
+  seat: SeatOverride | null = null;
 
   constructor(
     private readonly player: PlayerCharacter,
@@ -87,6 +109,31 @@ export class PlayerPresentation implements RenderSystem {
     const dt = ctx.frameSeconds;
     interpolatePose(this.transforms, this.entity, ctx.alpha, this.interpolated);
     const pose = this.interpolated;
+    const seat = this.seat;
+    if (seat) {
+      // In the vehicle's frame (includes a bike's lean).
+      seat.anchor.updateWorldMatrix(true, false);
+      seatLocal.lerpVectors(seat.door, seat.seat, seat.blend);
+      seatWorld.copy(seatLocal).applyMatrix4(seat.anchor.matrixWorld);
+      seat.anchor.getWorldQuaternion(seatQuat);
+      this.view.setTransformQuat(seatWorld.x, seatWorld.y, seatWorld.z, seatQuat);
+      this.yaw = 2 * Math.atan2(seatQuat.y, seatQuat.w);
+      pose.x = seatWorld.x;
+      pose.y = seatWorld.y;
+      pose.z = seatWorld.z;
+      this.view.setVisible(!seat.hidden);
+      const input = this.input;
+      input.seatedClip = seat.blend > 0.2 ? seat.clip : null;
+      input.steer = seat.steer;
+      input.mode = 'ground';
+      input.speed = 0;
+      input.aiming = false;
+      input.lookYaw = 0;
+      this.animator.update(input, dt, this.pose);
+      this.view.applyPose(this.pose);
+      return;
+    }
+    this.input.seatedClip = null;
     this.yaw = yawOf(pose);
     this.view.setTransform(pose.x, pose.y, pose.z, this.yaw);
     this.view.setVisible(!player.placing && !this.cameraTooClose);
@@ -177,9 +224,9 @@ export class PlayerCameraSystem implements RenderSystem {
   }
 
   renderUpdate(ctx: RenderContext): void {
+    if (!this.enabled) return;
     const input = this.input;
     input.readLook(ctx.frameSeconds, this.look);
-    if (!this.enabled) return;
     const player = this.player;
     const motor = player.motor;
     const p = this.presentation.interpolated;

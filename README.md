@@ -38,6 +38,21 @@ Click the view to capture the mouse. Every control can be rebound in **Esc → C
 | Camera distance | V | Back |
 | Pause menu | Esc or P | Start |
 
+## Controls (vehicles)
+
+| Action | Keyboard / mouse | Gamepad |
+|---|---|---|
+| Get in / out (walk up to a car; at speed this bails out) | F | Y |
+| Accelerate / brake & reverse | W / S | RT / LT |
+| Steer | A D | Left stick |
+| Handbrake | Space | RB |
+| Horn / siren (emergency vehicles) | H | Left stick click |
+| Camera: chase near → far → hood → driver's seat | V | Back |
+| Look around | Mouse | Right stick |
+| Manual gearbox (after `gearbox manual`) | E up / Q down | B / X |
+
+Locked cars: press F to smash the window, then hold still while it hotwires. Occupied cars: F pulls the driver out.
+
 ## Developer tools
 
 | Tool | How |
@@ -48,6 +63,8 @@ Click the view to capture the mouse. Every control can be rebound in **Esc → C
 | Free-fly camera | `fly` (WASD, E/Q up/down, Shift fast); `goto <place>` also switches to it |
 | Obstacle course | `course`, then `tpplayer wall12|wall26|tower10|tower30|water|ceiling|wallwalk` |
 | Player state | `damage <n>`, `heal`, `armor`, `kill`, `respawn`, `tpplayer <x> <z>` |
+| Vehicles | `spawncar <id> [enter|locked|driver]` (ids: brisa meridian cab vireo brakker haul courier linewalker sprint interceptor medic bulwark vaultline gullwing patrol), `fix`, `explode`, `vdamage <n>`, `siren`, `gearbox manual|auto`, `telemetry` (with F3) |
+| Driving pad | `course`, then `tpplayer pad` (200 m pad, ramp), `tpplayer barrier` (crash wall), `tpplayer mooring` (boats) |
 
 The M0 physics playground (`?scene=playground`) uses the fly camera; left click throws a box.
 

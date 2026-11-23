@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { ORBIT, OrbitCamera, type CameraCollision, type OrbitTarget } from './orbit-camera';
 
 const DT = 1 / 60;
-const open: CameraCollision = { sweep: (_ox, _oy, _oz, _dx, _dy, _dz, _r, max) => max };
+const open: CameraCollision = { ignore: null, sweep: (_ox, _oy, _oz, _dx, _dy, _dz, _r, max) => max };
 
 /** A wall plane z = wallZ (solid for z > wallZ): sweeps stop `radius` short of it. */
 function wallAt(wallZ: number): CameraCollision {
   return {
+    ignore: null,
     sweep(_ox, _oy, oz, _dx, _dy, dz, radius, max) {
       if (dz <= 0) return max;
       const free = (wallZ - radius - oz) / dz;
@@ -48,7 +49,7 @@ describe('OrbitCamera', () => {
   it('snaps in front of a wall immediately and eases back out when it clears', () => {
     const camera = new THREE.PerspectiveCamera();
     let collision = open;
-    const orbit = new OrbitCamera(camera, { sweep: (...a) => collision.sweep(...a) });
+    const orbit = new OrbitCamera(camera, { ignore: null, sweep: (...a) => collision.sweep(...a) });
     orbit.pitch = 0;
     for (let i = 0; i < 30; i++) orbit.update(target(), 0, 0, DT);
     collision = wallAt(1.5);
