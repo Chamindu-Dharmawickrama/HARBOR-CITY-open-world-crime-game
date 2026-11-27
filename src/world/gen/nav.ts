@@ -14,7 +14,8 @@ import {
 import type { TerrainModel } from './islands';
 import type { PlanarGraph } from './planar-graph';
 import { SIDEWALK_HEIGHT } from './props';
-import type { Block, Junction, Lane, LaneNode, RoadChain, SidewalkNode } from './types';
+import { laneWidthFor } from './road-profile';
+import type { Block, Crosswalk, Junction, Lane, LaneNode, RoadChain, SidewalkNode } from './types';
 
 export interface Point3 {
   x: number;
@@ -160,6 +161,10 @@ export function buildLaneGraph(
     junction: number,
     isConnector: boolean,
     signalGroup = -1,
+    chain = -1,
+    dir = 0,
+    offset = 0,
+    width = 3,
   ): number => {
     const id = lanes.length;
     lanes.push({
@@ -172,6 +177,12 @@ export function buildLaneGraph(
       junction,
       signalGroup,
       isConnector,
+      chain,
+      dir,
+      inner: -1,
+      outer: -1,
+      offset,
+      width,
     });
     return id;
   };
@@ -185,7 +196,8 @@ export function buildLaneGraph(
     const center = chainCenterline(graph, chain, junctionByNode);
     if (center.length < 2) continue;
     const lanesPerDir = Math.max(1, chain.lanesPerDirection);
-    const laneWidth = chain.width / (2 * lanesPerDir);
+    // Curb-parking streets keep their parking strips clear of the traffic lanes.
+    const laneWidth = laneWidthFor(chain.cls, chain.width, lanesPerDir);
     const speed = graph.edges[chain.edges[0]].attrs.speedLimit;
     const firstNode = chain.nodes[0];
     const lastNode = chain.nodes[chain.nodes.length - 1];
@@ -194,8 +206,31 @@ export function buildLaneGraph(
     const reversed = [...center].reverse();
     for (let i = 0; i < lanesPerDir; i++) {
       const off = (i + 0.5) * laneWidth;
-      forward.push(addLane(offsetPolyline3(center, off), chain.edges[0], i, speed, lastNode, false));
-      backward.push(addLane(offsetPolyline3(reversed, off), chain.edges[0], i, speed, firstNode, false));
+      const e = chain.edges[0];
+      forward.push(
+        addLane(offsetPolyline3(center, off), e, i, speed, lastNode, false, -1, chain.id, 1, off, laneWidth),
+      );
+      backward.push(
+        addLane(
+          offsetPolyline3(reversed, off),
+          e,
+          i,
+          speed,
+          firstNode,
+          false,
+          -1,
+          chain.id,
+          -1,
+          off,
+          laneWidth,
+        ),
+      );
+    }
+    for (const side of [forward, backward]) {
+      for (let i = 0; i < side.length; i++) {
+        lanes[side[i]].inner = i > 0 ? side[i - 1] : -1;
+        lanes[side[i]].outer = i < side.length - 1 ? side[i + 1] : -1;
+      }
     }
     const startDir = normalize(sub(center[1], center[0]));
     const endDir = normalize(sub(center[center.length - 2], center[center.length - 1]));
@@ -207,16 +242,18 @@ export function buildLaneGraph(
     const junction = junctionByNode.get(node);
     if (approaches.length === 1) {
       const a = approaches[0];
-      // Dead end: U-turn from the innermost incoming lane to the innermost outgoing lane.
-      const from = lanes[a.incoming[0]];
-      const to = lanes[a.outgoing[0]];
-      const p0 = laneNodes[from.points[from.points.length - 1]] as Point3;
-      const p2 = laneNodes[to.points[0]] as Point3;
-      const ahead = scale(a.dir, -Math.max(4, distance(p0, p2)));
-      const control = { ...add(scale(add(p0, p2), 0.5), ahead), y: (p0.y + p2.y) / 2 };
-      const id = addLane(bezier(p0, control, p2, 6), from.edge, 0, 5, node, true);
-      from.next.push(id);
-      lanes[id].next.push(to.id);
+      // Dead end: every incoming lane turns around into the outgoing lane with the same index.
+      for (let i = 0; i < a.incoming.length; i++) {
+        const from = lanes[a.incoming[i]];
+        const to = lanes[a.outgoing[Math.min(i, a.outgoing.length - 1)]];
+        const p0 = laneNodes[from.points[from.points.length - 1]] as Point3;
+        const p2 = laneNodes[to.points[0]] as Point3;
+        const ahead = scale(a.dir, -Math.max(4, distance(p0, p2)));
+        const control = { ...add(scale(add(p0, p2), 0.5), ahead), y: (p0.y + p2.y) / 2 };
+        const id = addLane(bezier(p0, control, p2, 6), from.edge, i, 5, node, true);
+        from.next.push(id);
+        lanes[id].next.push(to.id);
+      }
       continue;
     }
     if (junction?.signalized) assignPhases(approaches);
@@ -294,14 +331,20 @@ function bezier(p0: Point3, c: Point3, p2: Point3, segments: number): Point3[] {
   return out;
 }
 
+export interface SidewalkGraphResult {
+  nodes: SidewalkNode[];
+  crosswalks: Crosswalk[];
+}
+
 /** Sidewalk rings around every block plus crosswalk links across each junction approach. */
 export function buildSidewalkGraph(
   graph: PlanarGraph,
   blocks: readonly Block[],
   junctions: readonly Junction[],
   terrain: TerrainModel,
-): SidewalkNode[] {
+): SidewalkGraphResult {
   const nodes: SidewalkNode[] = [];
+  const crosswalks: Crosswalk[] = [];
   for (const block of blocks) {
     const sidewalk = terrain.district(block.district).sidewalkWidth;
     const path = insetPolygon(block.curb, sidewalk / 2) ?? block.curb;
@@ -350,13 +393,22 @@ export function buildSidewalkGraph(
       if (l < 0 || r < 0 || l === r) continue;
       const nl = nodes[l];
       const nr = nodes[r];
-      if (!nl.links.includes(r)) nl.links.push(r);
-      if (!nr.links.includes(l)) nr.links.push(l);
+      if (nl.links.includes(r)) continue;
+      nl.links.push(r);
+      nr.links.push(l);
+      crosswalks.push({
+        id: crosswalks.length,
+        a: l,
+        b: r,
+        junction: junction.node,
+        edge: trim.edge,
+        signalized: junction.signalized,
+      });
       if (junction.signalized) {
         nl.crossingJunction = junction.node;
         nr.crossingJunction = junction.node;
       }
     }
   }
-  return nodes;
+  return { nodes, crosswalks };
 }

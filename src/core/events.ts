@@ -29,6 +29,10 @@ export interface GameEvents {
   'vehicle:onFire': { vehicle: number };
   'vehicle:exploded': { vehicle: number; x: number; y: number; z: number };
   'vehicle:horn': { vehicle: number; siren: boolean };
+  /** A gunshot (or anything as loud) at a point: people panic, drivers flee (weapons arrive in M5). */
+  'combat:shot': { x: number; y: number; z: number };
+  'ped:hitByVehicle': { vehicle: number; speed: number; killed: boolean };
+  'ped:panicked': { count: number; x: number; z: number };
   'menu:opened': { menu: string };
   'menu:closed': { menu: string };
 }

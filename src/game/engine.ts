@@ -9,6 +9,7 @@ import { FIXED_STEP_SECONDS, GameLoop } from '../core/loop';
 import { Profiler } from '../core/profiler';
 import { RngStreams } from '../core/rng';
 import { SimClock } from '../core/sim-clock';
+import { TimeOfDay } from '../core/time-of-day';
 import { RingBuffer } from '../core/stats';
 import { CommandRegistry } from '../debug/command-registry';
 import { DevConsole } from '../debug/dev-console';
@@ -33,7 +34,9 @@ import { BenchRecorder, type BenchResult } from './bench';
 import { registerCoreCommands } from './dev-commands';
 import type { UrlParams } from './url-params';
 
-export const GAME_VERSION = '0.3.0-m2';
+export const GAME_VERSION = '0.4.0-m4';
+/** The in-game clock starts mid-morning. */
+export const START_HOUR = 10;
 
 export function readHeapMB(): number | null {
   const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
@@ -59,6 +62,8 @@ export interface Engine {
   readonly profiler: Profiler;
   readonly scheduler: Scheduler;
   readonly clock: SimClock;
+  /** The 24 h game clock (1 game minute per real second by default). */
+  readonly timeOfDay: TimeOfDay;
   readonly loop: GameLoop;
   readonly flyCamera: FreeFlyCamera;
   readonly overlay: DebugOverlay;
@@ -101,11 +106,13 @@ export async function createEngine(root: HTMLElement, params: UrlParams): Promis
   const profiler = new Profiler();
   const scheduler = new Scheduler(profiler);
   const clock = new SimClock(FIXED_STEP_SECONDS);
+  const timeOfDay = new TimeOfDay(START_HOUR);
   const flyCamera = new FreeFlyCamera(gfx.camera, input);
   const physicsLines = new PhysicsDebugDraw(physics, gfx.scene);
   const benchMode = params.bench !== null;
 
   scheduler
+    .addFixed({ name: 'timeOfDay', phase: 'input', fixedUpdate: (ctx) => timeOfDay.advance(ctx.dt) })
     .addFixed(createTransformSnapshotSystem(world))
     .addFixed(createPhysicsStepSystem(physics))
     .addFixed(createRigidBodySyncSystem(world))
@@ -233,9 +240,11 @@ export async function createEngine(root: HTMLElement, params: UrlParams): Promis
       overlay.frame(frameSeconds * 1000, frameSeconds);
       for (const hook of frameHooks) hook(frameSeconds, cpuMs);
       if (bench && api && !bench.done && frames > 1) {
+        const wasRecording = bench.recording;
         bench.frame(frameSeconds, cpuMs, renderStats.drawCalls, renderStats.triangles, readHeapMB(), () =>
           profiler.lastFrame(5),
         );
+        if (!wasRecording && bench.recording) profiler.resetCumulative();
         if (bench.done) engine.finishBench(params.bench ?? 'none');
       }
       if (api && !api.ready && frames >= 3) api.ready = true;
@@ -337,6 +346,7 @@ export async function createEngine(root: HTMLElement, params: UrlParams): Promis
     profiler,
     scheduler,
     clock,
+    timeOfDay,
     loop,
     flyCamera,
     overlay,
@@ -369,6 +379,7 @@ export async function createEngine(root: HTMLElement, params: UrlParams): Promis
         userAgent: navigator.userAgent,
         droppedSimSeconds: loop.accumulator.droppedSeconds,
       });
+      result.systems = profiler.cumulativeReport(16);
       api.bench = { done: true, result };
       console.info(`[bench] ${JSON.stringify(result)}`);
     },

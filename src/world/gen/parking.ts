@@ -9,6 +9,7 @@ import {
   type Vec2,
 } from './geometry2d';
 import type { TerrainModel } from './islands';
+import { CURB_PARKING_INSET, hasCurbParking } from './road-profile';
 import type { CityLayout, DistrictId } from './types';
 
 export type ParkingKind = 'lot' | 'curb' | 'boat';
@@ -24,10 +25,7 @@ export interface ParkingSpot {
   yaw: number;
 }
 
-/** Curb parking only on streets wide enough to keep a parking strip beside the traffic lane. */
-const CURB_MIN_WIDTH = 9;
 const CURB_SPACING = 6.6;
-const CURB_INSET = 1.05;
 const STALL_WIDTH = 2.7;
 const STALL_DEPTH = 5.4;
 const AISLE = 6.5;
@@ -95,11 +93,29 @@ export function generateParkingSpots(layout: CityLayout, terrain: TerrainModel):
     }
   }
 
-  // Curbs.
+  // Curbs (never where another road's carriageway passes, e.g. beside a junction cluster).
+  const onOtherRoad = (x: number, z: number, own: number): boolean => {
+    for (const other of layout.edges) {
+      if (other.id === own) continue;
+      const a = layout.nodes[other.a];
+      const b = layout.nodes[other.b];
+      if (!a || !b) continue;
+      const reach = other.width / 2 + 1.2;
+      if (x < Math.min(a.x, b.x) - reach || x > Math.max(a.x, b.x) + reach) continue;
+      if (z < Math.min(a.z, b.z) - reach || z > Math.max(a.z, b.z) + reach) continue;
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const len2 = dx * dx + dz * dz;
+      const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / len2)) : 0;
+      if (hypot(x - a.x - dx * t, z - a.z - dz * t) < reach) return true;
+    }
+    return false;
+  };
   const trimAt = new Map<string, number>();
   for (const j of layout.junctions) for (const t of j.trims) trimAt.set(`${j.node}:${t.edge}`, t.distance);
   for (const edge of layout.edges) {
-    if (edge.cls !== 'street' || edge.width < CURB_MIN_WIDTH) continue;
+    // Curb parking only where the street keeps a parking strip beside its traffic lanes.
+    if (!hasCurbParking(edge.cls, edge.width)) continue;
     const a = layout.nodes[edge.a];
     const b = layout.nodes[edge.b];
     if (!a || !b) continue;
@@ -109,22 +125,20 @@ export function generateParkingSpots(layout: CityLayout, terrain: TerrainModel):
     if (end - start < CURB_SPACING) continue;
     const dir = normalize(sub(b, a));
     const right = perpendicular(dir);
-    const offset = edge.width / 2 - CURB_INSET;
+    const offset = edge.width / 2 - CURB_PARKING_INSET;
     for (let d = start + CURB_SPACING / 2; d <= end - CURB_SPACING / 2; d += CURB_SPACING) {
       const t = d / len;
       const y = a.y + (b.y - a.y) * t;
       const px = a.x + dir.x * d;
       const pz = a.z + dir.z * d;
       // Right-hand traffic: cars on the right of a→b face a→b, on the left they face b→a.
-      add('curb', edge.district, px + right.x * offset, pz + right.z * offset, yawOf(dir), y);
-      add(
-        'curb',
-        edge.district,
-        px - right.x * offset,
-        pz - right.z * offset,
-        yawOf({ x: -dir.x, z: -dir.z }),
-        y,
-      );
+      const rx = px + right.x * offset;
+      const rz = pz + right.z * offset;
+      if (!onOtherRoad(rx, rz, edge.id)) add('curb', edge.district, rx, rz, yawOf(dir), y);
+      const lx = px - right.x * offset;
+      const lz = pz - right.z * offset;
+      if (!onOtherRoad(lx, lz, edge.id))
+        add('curb', edge.district, lx, lz, yawOf({ x: -dir.x, z: -dir.z }), y);
     }
   }
 

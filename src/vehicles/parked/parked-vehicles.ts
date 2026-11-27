@@ -116,7 +116,8 @@ export class ParkedVehicles {
   private despawnFar(x: number, z: number): void {
     const far2 = this.options.despawnRadius ** 2;
     for (const v of [...this.vehicles.vehicles]) {
-      if (v.driver === 'player') continue;
+      // Traffic manages its own vehicles.
+      if (v.driver === 'player' || v.owner === 'traffic') continue;
       const t = v.sim.body.translation();
       const d2 = (t.x - x) ** 2 + (t.z - z) ** 2;
       const limit = v.persistent ? far2 * 4 : far2;
@@ -188,6 +189,7 @@ export class ParkedVehicles {
           locked: plan.locked,
           spot: spot.index,
           engineOn: plan.occupied,
+          owner: 'parked',
         },
       );
       if (plan.occupied) this.seatDriver(v, spot);

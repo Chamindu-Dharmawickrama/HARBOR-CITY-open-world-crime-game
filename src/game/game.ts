@@ -4,7 +4,7 @@ import { setupCityScene } from './scenes/city-scene';
 import { setupPlaygroundScene } from './scenes/playground-scene';
 import type { UrlParams } from './url-params';
 
-export const BENCH_SCENARIOS = ['playground', 'flythrough'] as const;
+export const BENCH_SCENARIOS = ['playground', 'flythrough', 'traffic'] as const;
 
 /** Composition root: builds the engine, then the requested scene, then starts the loop. */
 export async function startGame(root: HTMLElement, params: UrlParams): Promise<void> {

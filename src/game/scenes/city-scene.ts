@@ -30,8 +30,10 @@ import { DebugBoxes } from '../debug-boxes';
 import { showControlHint, type Engine } from '../engine';
 import { CITY_VIEWPOINTS, FLYTHROUGH_PATH } from './city-viewpoints';
 import { generateParkingSpots } from '../../world/gen/parking';
-import { createWaterTest, setupPlayer, sidewalkSpawn } from './player-setup';
+import { createWaterTest, setupPlayer, sidewalkSpawn, type PlayerHandle } from './player-setup';
+import { setupPopulation } from './population-setup';
 import { setupDriving, setupVehicles } from './vehicle-setup';
+import type { TrafficManager } from '../../ai/traffic/traffic-manager';
 
 /** On-foot spawn: the downtown sidewalk nearest this point. */
 const SPAWN_NEAR = { x: 560, z: 430 };
@@ -268,12 +270,19 @@ export async function setupCityScene(engine: Engine, city: CityDef): Promise<voi
     curb: parkingSpots.filter((s) => s.kind === 'curb').length,
     boat: parkingSpots.filter((s) => s.kind === 'boat').length,
   }));
+  let playerHandle: PlayerHandle | null = null;
   if (params.bench === 'flythrough') {
     engine.flyCamera.enabled = false;
     scheduler.addRender(createFlythroughCamera(camera));
+  } else if (params.bench === 'traffic') {
+    // Rush hour at street level, the camera riding behind AI cars.
+    engine.flyCamera.enabled = false;
+    engine.timeOfDay.set(17.5);
+    const spawn = sidewalkSpawn(layout, SPAWN_NEAR.x, SPAWN_NEAR.z);
+    camera.position.set(spawn.x, spawn.y + 3, spawn.z);
   } else {
     const spawn = sidewalkSpawn(layout, SPAWN_NEAR.x, SPAWN_NEAR.z);
-    const playerHandle = setupPlayer(
+    playerHandle = setupPlayer(
       engine,
       { terrain: model.terrain, layout, waterLevel: city.waterLevel, courseNear: COURSE_NEAR },
       spawn,
@@ -286,6 +295,10 @@ export async function setupCityScene(engine: Engine, city: CityDef): Promise<voi
       'Click to play · WASD move · Shift sprint · Space jump/climb · C crouch · RMB aim · F enter car · V camera · Esc menu · ` console',
     );
   }
+
+  // Traffic, pedestrians and live traffic lights.
+  const population = setupPopulation(engine, model, vehicleWorld, props, playerHandle);
+  if (params.bench === 'traffic') scheduler.addRender(createTrafficChaseCamera(camera, population.traffic));
 
   // ---- prime streaming around the start position before showing the world -------------------
   const primeStart = performance.now();
@@ -416,6 +429,48 @@ export async function setupCityScene(engine: Engine, city: CityDef): Promise<voi
     run: () => JSON.stringify({ ...streamer.stats(), progress: Number(streamer.progress().toFixed(3)) }),
   });
   probes.register('knocked', () => layout.props.map((_, i) => i).filter((i) => props.isKnocked(i)));
+}
+
+/** Benchmark camera for the traffic scenario: follows one AI car after another from behind. */
+function createTrafficChaseCamera(camera: THREE.PerspectiveCamera, traffic: TrafficManager): RenderSystem {
+  let target: TrafficManager['entries'][number] | null = null;
+  let time = 0;
+  const goal = new THREE.Vector3();
+  const look = new THREE.Vector3();
+  return {
+    name: 'benchTrafficCamera',
+    phase: 'camera',
+    renderUpdate(ctx: RenderContext): void {
+      time += ctx.frameSeconds;
+      // Ride along for a while, then switch to the nearest other car.
+      if (!target || !traffic.entries.includes(target) || time > 14) {
+        time = 0;
+        let best = null as typeof target;
+        let bestD = Infinity;
+        for (const e of traffic.entries) {
+          if (e === target || e.mode !== 'physics') continue;
+          const t = e.vehicle.view.root.position;
+          const d = t.distanceToSquared(camera.position);
+          if (d < bestD) {
+            bestD = d;
+            best = e;
+          }
+        }
+        target = best ?? target;
+      }
+      if (!target) return;
+      const root = target.vehicle.view.root;
+      look.set(0, 0, 1).applyQuaternion(root.quaternion);
+      goal
+        .copy(root.position)
+        .addScaledVector(look, -10)
+        .add(new THREE.Vector3(0, 3.6, 0));
+      camera.position.lerp(goal, 1 - Math.exp(-ctx.frameSeconds * 4));
+      look.multiplyScalar(8).add(root.position);
+      look.y += 1;
+      camera.lookAt(look);
+    },
+  };
 }
 
 /** Benchmark camera: a fixed loop over all three islands, both bridges and the tunnel. */

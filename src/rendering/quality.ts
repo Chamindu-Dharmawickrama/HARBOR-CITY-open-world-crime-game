@@ -20,6 +20,9 @@ export interface QualitySettings {
   readonly propDistance: number;
   /** Half size of the sun shadow frustum around the camera, metres. */
   readonly shadowExtent: number;
+  /** Hard caps on pedestrians and traffic vehicles around the camera. */
+  readonly maxPedestrians: number;
+  readonly maxTraffic: number;
 }
 
 export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings>> = {
@@ -34,6 +37,8 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     nearRing: 160,
     propDistance: 140,
     shadowExtent: 90,
+    maxPedestrians: 24,
+    maxTraffic: 16,
   },
   medium: {
     name: 'medium',
@@ -46,6 +51,8 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     nearRing: 220,
     propDistance: 220,
     shadowExtent: 130,
+    maxPedestrians: 48,
+    maxTraffic: 30,
   },
   high: {
     name: 'high',
@@ -58,6 +65,8 @@ export const QUALITY_PRESETS: Readonly<Record<QualityPresetName, QualitySettings
     nearRing: 260,
     propDistance: 300,
     shadowExtent: 180,
+    maxPedestrians: 80,
+    maxTraffic: 45,
   },
 };
 

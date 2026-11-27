@@ -33,6 +33,14 @@ conventions and current milestone status.
 | Vehicle rendering | One skinned mesh per vehicle (paint/glass/lights groups, bones for doors/wheels/fork); lamp states via per-vehicle uniforms | ~3 draw calls per car, no textures; dents copy the geometry on write (M3) |
 | Crash damage | Contact-force listener → per-vehicle crash window (only a harder hit adds damage), per-crash cap, spawn grace | One crash never wrecks a car outright; spawn overlaps are not crashes (M3) |
 | Handling targets | Plan targets for cars; heavy classes get realistic skidpad ranges (bus 0.6–0.85 g, trucks 0.6–0.95 g) | A bus at 0.8 g would tip; every range is asserted by the harness (M3) |
+| Traffic model | Own microscopic model in pure TS (`ai/traffic/traffic-sim`): IDM car-following, junction admission over precomputed geometric conflict sets (priority road, straight before turns, first come first served, "don't block the box"), amber stop-or-go, MOBIL-lite lane changes, path-sampled obstacle sensing | Runs headless for the 10-minute city test (160 cars, ~1 s); the same logic drives physics and kinematic cars (M4) |
+| Traffic LOD | Within ~110–160 m of the camera cars are raycast-vehicle physics steered by pure pursuit; beyond they are kinematic Rapier bodies following their lanes, promoted once the ground collider under them exists | Physics only where colliders stream in; far cars cost one pose write (M4) |
+| Close junctions | Links shorter than 12 m between two junctions are internal: no stop line or light, cars are admitted through the whole chain at once; a cluster's signals share one controller | Cars waiting on a 3 m link with their rear in the previous junction deadlocked the grid (M4) |
+| Signal phases | Approaches 2-coloured on their straight-path conflict graph (3 phases where 2 cannot separate crossing flows; 14 such junctions on the default seed); walk aspect while the crossed approach is red | Skewed and split junctions had crossing flows sharing a phase (M4) |
+| Gridlock measure | A car is "stalled" while it stands still and is not held by a red light; stalled > 40 s → gridlock flag (removed when out of view). The headless test requires max stalled < 60 s, zero flags, and total stand-still < 100 s | Waiting at a busy 3-phase light is delay, not gridlock (M4) |
+| Pedestrian locomotion | Crowd NPCs move kinematically along the sidewalk graph (position set, ground by ray cast every other tick near the camera); the character controller only runs for free-running NPCs (drivers pulled from cars) | ~80 people without 80 controller sweeps per tick (M4) |
+| Ragdolls | 11 Rapier bodies (box head, capsule limbs), spherical joints with strong angular damping, limited hinges at knees/elbows; pool of 8 (5 on Low); settled ragdolls freeze into a lying pose and blend back to standing | Stable, cheap, reusable by M5 combat (M4) |
+| Time of day | `core/time-of-day` (1 game minute per second, starts 10:00) introduced in M4 to drive density; lighting follows in M8 | Density curves are per district and hour (M4) |
 
 ## 1. Product summary
 
@@ -421,8 +429,16 @@ updated, commit `M<n>: …`, short report (what works, known-broken, how to hand
 - Glass damage is per vehicle (intact → cracked → shattered), not per window.
 - Motorbikes lean visually; the physics body stays upright. Riders are thrown off in big crashes but there is no ragdoll until M5.
 - Boats: flat water in physics (no waves, no planing lift); boarding works from the water or right beside the hull.
-- Curb parking uses the outer metre of wide (9 m) streets; M4 traffic lanes must keep clear of that strip.
-- NPC drivers of parked cars sit still with the engine running until the M4 traffic AI drives them.
+- Curb parking uses a 2.1 m strip along each kerb of 9 m streets; their traffic lanes are narrowed to keep clear of it.
+- NPC drivers of parked cars sit still with the engine running (they are carjack targets, not traffic).
+- Traffic lights show the vehicle aspect only; pedestrian walk lamps are not drawn (people still obey the walk phase).
+- Internal junction links (< 12 m) keep the painted stop line from the ground shader but have no stop of their own; their signal heads stay dark and pedestrians do not cross there. Unsignalled junctions inside a signalled cluster follow the shared controller without poles of their own.
+- City-wide, beyond ~200 simultaneous cars two ring-road junction clusters saturate (waits over a minute); the in-game caps (≤ 45 cars around the camera) stay below that.
+- Traffic has no motorbikes, no parking/unparking manoeuvres and does not reverse out of jams; cars stuck for 40 s are removed once out of view (gridlock detector).
+- Far (kinematic) traffic does not collide with other far traffic; it follows its lane model, which keeps the gaps.
+- The player on foot is not knocked down by vehicles (cars stop against the player's capsule; AI drivers brake for the player) until M5.
+- Pedestrians stay on the sidewalk graph (fleeing included; panicking people cross against the lights); they do not wander into park interiors. Fighting back and witness reports come with M5/M6.
+- Getting up after a ragdoll is a blend from the lying pose to standing (no dedicated get-up clip).
 - The horn/siren key toggles light bars and raises a `vehicle:horn` event; all vehicle sound arrives with M9.
 - The manual gearbox (E/Q) is switched on with the `gearbox` console command until the M10 settings menu.
 - Wheels can be torn off cars, not bikes; torn-off wheels are loose debris for 30 s.

@@ -10,6 +10,7 @@ import {
   type Polygon,
 } from './geometry2d';
 import { edgeCorridor } from './blocks';
+import { generateParkingSpots } from './parking';
 import type { CityLayout, DistrictId } from './types';
 
 const SEED = 74613;
@@ -149,6 +150,61 @@ describe('city layout', () => {
     const crossings = layout.sidewalks.filter((n) => n.links.length > 2).length;
     expect(crossings).toBeGreaterThan(500);
     expect(layout.sidewalks.some((n) => n.crossingJunction >= 0)).toBe(true);
+  });
+
+  it('every lane leads somewhere, and neighbouring lanes are linked both ways', () => {
+    for (const lane of layout.lanes) {
+      expect(lane.next.length).toBeGreaterThan(0);
+      if (lane.inner >= 0) expect(layout.lanes[lane.inner].outer).toBe(lane.id);
+      if (lane.outer >= 0) expect(layout.lanes[lane.outer].inner).toBe(lane.id);
+    }
+  });
+
+  it('keeps traffic lanes clear of the curb-parking strips', () => {
+    const spots = generateParkingSpots(layout, model.terrain).filter((s) => s.kind === 'curb');
+    expect(spots.length).toBeGreaterThan(100);
+    // Lane centre lines vs parked car centres: a parked car (≤ 2 m wide) and a passing car
+    // (≤ 2 m wide) need at least 2.2 m between their centres.
+    const segments: { ax: number; az: number; bx: number; bz: number }[] = [];
+    for (const lane of layout.lanes) {
+      if (lane.isConnector) continue;
+      for (let i = 1; i < lane.points.length; i++) {
+        const a = layout.laneNodes[lane.points[i - 1]];
+        const b = layout.laneNodes[lane.points[i]];
+        segments.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z });
+      }
+    }
+    let worst = Infinity;
+    for (const s of spots) {
+      for (const g of segments) {
+        if (Math.min(g.ax, g.bx) > s.x + 6 || Math.max(g.ax, g.bx) < s.x - 6) continue;
+        if (Math.min(g.az, g.bz) > s.z + 6 || Math.max(g.az, g.bz) < s.z - 6) continue;
+        const dx = g.bx - g.ax;
+        const dz = g.bz - g.az;
+        const t = Math.max(
+          0,
+          Math.min(1, ((s.x - g.ax) * dx + (s.z - g.az) * dz) / (dx * dx + dz * dz || 1)),
+        );
+        worst = Math.min(worst, Math.hypot(s.x - g.ax - dx * t, s.z - g.az - dz * t));
+      }
+    }
+    expect(worst).toBeGreaterThan(2.2);
+  });
+
+  it('records every traffic-light pole with the approach it controls, and every crosswalk', () => {
+    const poles = layout.props.filter((p) => p.type === 'trafficLight');
+    expect(layout.signalHeads).toHaveLength(poles.length);
+    const signalled = new Set(layout.junctions.filter((j) => j.signalized).map((j) => j.node));
+    for (const h of layout.signalHeads) {
+      expect(layout.props[h.prop].type).toBe('trafficLight');
+      expect(signalled.has(h.junction)).toBe(true);
+      expect(layout.nodes[h.junction].edges).toContain(h.edge);
+    }
+    expect(layout.crosswalks.length).toBeGreaterThan(500);
+    for (const c of layout.crosswalks) {
+      expect(layout.sidewalks[c.a].links).toContain(c.b);
+      expect(layout.sidewalks[c.b].links).toContain(c.a);
+    }
   });
 
   it('terrain heights are smooth and coastal heights equal the island base', () => {

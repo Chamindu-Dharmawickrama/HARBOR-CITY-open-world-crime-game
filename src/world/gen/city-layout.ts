@@ -9,7 +9,7 @@ import type { GraphEdge, GraphNode, PlanarGraph } from './planar-graph';
 import { placePiers, placeProps } from './props';
 import { buildRoadNetwork } from './road-network';
 import { buildChains, buildJunctions } from './road-topology';
-import type { CityDef, CityLayout, Pier, RoadEdge, RoadNode } from './types';
+import type { CityDef, CityLayout, Pier, RoadEdge, RoadNode, SignalHead } from './types';
 
 /** Everything derived from (city definition, seed). Deterministic; safe to run in a worker. */
 export interface CityModel {
@@ -38,6 +38,7 @@ export function generateCity(city: CityDef, seed: number): CityModel {
       ...placePiers(docksIsland.coast, center, city.crossings, docks.island.baseHeight, rngs.get('piers'), 6),
     );
   }
+  const signalHeads: SignalHead[] = [];
   const props = placeProps(
     graph,
     junctions,
@@ -50,9 +51,10 @@ export function generateCity(city: CityDef, seed: number): CityModel {
     city,
     terrain,
     rngs,
+    signalHeads,
   );
   const { lanes, laneNodes } = buildLaneGraph(graph, chains, junctions);
-  const sidewalks = buildSidewalkGraph(graph, blocks, junctions, terrain);
+  const { nodes: sidewalks, crosswalks } = buildSidewalkGraph(graph, blocks, junctions, terrain);
 
   const nodes: RoadNode[] = graph.nodes.map((n: GraphNode, id) => ({
     id,
@@ -79,6 +81,8 @@ export function generateCity(city: CityDef, seed: number): CityModel {
     lanes,
     laneNodes,
     sidewalks,
+    crosswalks,
+    signalHeads,
     stats: {
       nodes: nodes.length,
       edges: edges.length,
@@ -93,6 +97,8 @@ export function generateCity(city: CityDef, seed: number): CityModel {
       signs: signs.length,
       lanes: lanes.length,
       sidewalkNodes: sidewalks.length,
+      crosswalks: crosswalks.length,
+      signalHeads: signalHeads.length,
     },
   };
   return { layout, terrain, graph };
@@ -108,7 +114,8 @@ export function layoutHash(layout: CityLayout): string {
     for (const p of b.tiers[0]?.footprint ?? []) h.addFloat(p.x).addFloat(p.z);
   }
   for (const p of layout.props) h.addString(p.type).addFloat(p.x).addFloat(p.z);
-  h.addInt(layout.lanes.length).addInt(layout.sidewalks.length);
+  h.addInt(layout.lanes.length).addInt(layout.sidewalks.length).addInt(layout.crosswalks.length);
+  for (const n of layout.laneNodes) h.addFloat(n.x, 1e-3).addFloat(n.z, 1e-3);
   return h.hex();
 }
 

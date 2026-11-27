@@ -299,6 +299,36 @@ export interface Lane {
   /** For connectors inside a junction: the signal phase group (or -1). */
   signalGroup: number;
   isConnector: boolean;
+  /** Road chain this lane runs along (−1 for connectors). */
+  chain: number;
+  /** +1 along the chain's node order, −1 against it (0 for connectors). */
+  dir: number;
+  /** Neighbouring lane in the same direction toward the centre line / toward the kerb (or −1). */
+  inner: number;
+  outer: number;
+  /** Distance from the road centre line to this lane's centre (m). */
+  offset: number;
+  /** Lane width (m). */
+  width: number;
+}
+
+/** A crosswalk link of the sidewalk graph: where pedestrians cross a junction approach. */
+export interface Crosswalk {
+  id: number;
+  /** Sidewalk node ids at both kerbs. */
+  a: number;
+  b: number;
+  /** Junction node and the road edge being crossed. */
+  junction: number;
+  edge: number;
+  signalized: boolean;
+}
+
+/** A traffic-light pole (prop) and the junction approach it controls. */
+export interface SignalHead {
+  prop: number;
+  junction: number;
+  edge: number;
 }
 
 export interface SidewalkNode {
@@ -328,5 +358,7 @@ export interface CityLayout {
   lanes: Lane[];
   laneNodes: LaneNode[];
   sidewalks: SidewalkNode[];
+  crosswalks: Crosswalk[];
+  signalHeads: SignalHead[];
   stats: Record<string, number>;
 }

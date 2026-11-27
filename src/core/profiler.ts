@@ -15,6 +15,9 @@ export class Profiler {
   private readonly slotsByName = new Map<string, number>();
   private frameTotals = new Float64Array(16);
   private lastTotals = new Float64Array(16);
+  /** Running totals since the last resetCumulative (benchmarks: whole-run averages per section). */
+  private cumulative = new Float64Array(16);
+  private cumulativeFrames = 0;
   private readonly history: RingBuffer[] = [];
 
   constructor(
@@ -36,6 +39,9 @@ export class Profiler {
       const grownLast = new Float64Array(this.lastTotals.length * 2);
       grownLast.set(this.lastTotals);
       this.lastTotals = grownLast;
+      const grownCumulative = new Float64Array(this.cumulative.length * 2);
+      grownCumulative.set(this.cumulative);
+      this.cumulative = grownCumulative;
     }
     return slot;
   }
@@ -49,8 +55,10 @@ export class Profiler {
     for (let i = 0; i < this.names.length; i++) {
       this.history[i].push(this.frameTotals[i]);
       this.lastTotals[i] = this.frameTotals[i];
+      this.cumulative[i] += this.frameTotals[i];
       this.frameTotals[i] = 0;
     }
+    this.cumulativeFrames++;
   }
 
   /** Average and max per section over the history window, sorted by average descending. */
@@ -68,6 +76,20 @@ export class Profiler {
     return this.names
       .map((name, i) => ({ name, ms: this.lastTotals[i] }))
       .sort((a, b) => b.ms - a.ms)
+      .slice(0, limit);
+  }
+
+  resetCumulative(): void {
+    this.cumulative.fill(0);
+    this.cumulativeFrames = 0;
+  }
+
+  /** Average ms per frame of each section since resetCumulative, largest first. */
+  cumulativeReport(limit = 16): { name: string; avgMs: number }[] {
+    const n = Math.max(1, this.cumulativeFrames);
+    return this.names
+      .map((name, i) => ({ name, avgMs: this.cumulative[i] / n }))
+      .sort((a, b) => b.avgMs - a.avgMs)
       .slice(0, limit);
   }
 

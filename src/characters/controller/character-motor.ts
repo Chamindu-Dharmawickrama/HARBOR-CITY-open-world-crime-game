@@ -177,6 +177,27 @@ export class CharacterMotor {
     this.body.setNextKinematicTranslation({ x, y, z });
   }
 
+  /**
+   * Scripted locomotion (crowd pedestrians on their sidewalk paths): moves the capsule straight to
+   * (x, y, z) facing `yaw` without a character-controller sweep, reporting `speed` for animation.
+   */
+  placeKinematic(x: number, y: number, z: number, yaw: number, speed: number, dt: number): void {
+    const vx = dt > 0 ? (x - this.pos.x) / dt : 0;
+    const vz = dt > 0 ? (z - this.pos.z) / dt : 0;
+    this.velocity.x = vx;
+    this.velocity.y = 0;
+    this.velocity.z = vz;
+    this.pos.x = x;
+    this.pos.y = y + MOTOR.skin;
+    this.pos.z = z;
+    this.yaw = yaw;
+    this.speed += (speed - this.speed) * Math.min(1, dt * 12);
+    this.mode = 'ground';
+    this.grounded = true;
+    this.airTime = 0;
+    this.commit();
+  }
+
   kill(): void {
     this.mode = 'dead';
     this.climb = null;

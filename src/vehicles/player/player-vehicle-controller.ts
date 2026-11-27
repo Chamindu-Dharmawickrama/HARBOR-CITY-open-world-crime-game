@@ -275,6 +275,8 @@ export class PlayerVehicleController {
     const reach = Math.hypot(p.x - t.x, p.z - t.z) - Math.max(v.def.length, v.def.width) / 2;
     if (reach > DRIVE.enterRange - 2) return;
     this.vehicle = v;
+    // An AI driver stops and waits while the player gets in (or pulls them out).
+    v.held = true;
     this.prepareSeat(v);
     this.door = this.chooseDoor(v);
     this.jacking = v.occupant !== null;
@@ -336,6 +338,7 @@ export class PlayerVehicleController {
     if (this.timer <= 0 || moving || this.input.pressed('interact')) {
       player.autoMove = null;
       this.phase = 'foot';
+      v.held = false;
       this.vehicle = null;
       return;
     }
@@ -459,6 +462,7 @@ export class PlayerVehicleController {
     const player = this.player;
     player.autoMove = null;
     if (v) {
+      v.held = false;
       if (this.door >= 0 && !instant) v.view.doorTarget[this.door] = 0;
       if (instant && this.door >= 0) v.view.doorTarget[this.door] = 0;
       v.driver = 'none';

@@ -303,7 +303,7 @@ export class RaycastVehicle implements VehicleSim {
       drive = c.throttle;
       brake = c.brake;
       // Arcade reverse: holding the brake at a standstill (engine running) engages reverse.
-      if (this.engineOn && c.brake > 0.1 && c.throttle < 0.1 && speed < 0.8) {
+      if (c.allowReverse && this.engineOn && c.brake > 0.1 && c.throttle < 0.1 && speed < 0.8) {
         dt0.shiftTo(-1);
         brake = 0;
       }
@@ -685,6 +685,104 @@ export class RaycastVehicle implements VehicleSim {
     return this.drivetrain.rpm;
   }
 
+  /**
+   * Far traffic: the body becomes kinematic and follows poses given by `driveKinematic` (no
+   * suspension or tire work, no ground collider needed). `false` hands it back to the simulation.
+   */
+  kinematic = false;
+
+  setKinematic(on: boolean): void {
+    if (on === this.kinematic) return;
+    this.kinematic = on;
+    const types = this.physics.rapier.RigidBodyType;
+    this.body.setBodyType(on ? types.KinematicPositionBased : types.Dynamic, true);
+    if (on) {
+      this.body.setLinvel(this.zero, false);
+      this.body.setAngvel(this.zero, false);
+    }
+  }
+
+  /**
+   * Kinematic mode: moves the body to its next pose (yaw about +Y, then pitch, + = nose up) and
+   * keeps the wheels, steering and telemetry looking driven at `speed` m/s.
+   */
+  driveKinematic(
+    x: number,
+    y: number,
+    z: number,
+    yaw: number,
+    pitch: number,
+    speed: number,
+    steer: number,
+    dt: number,
+  ): void {
+    const q = yawPitch(yaw, pitch, this.rotationScratch);
+    this.posScratch.x = x;
+    this.posScratch.y = y;
+    this.posScratch.z = z;
+    this.body.setNextKinematicTranslation(this.posScratch);
+    this.body.setNextKinematicRotation(q);
+    this.steerAngle = steer;
+    const d = this.def;
+    for (let i = 0; i < this.wheels.length; i++) {
+      const w = this.wheels[i];
+      if (w.detached) continue;
+      w.grounded = true;
+      w.compression = this.restCompression[i];
+      w.suspensionLength = d.suspension.restLength - w.compression;
+      w.steer = w.front ? steer : 0;
+      w.omega = speed / d.wheelRadius;
+      w.rotation += w.omega * dt;
+      w.slip = 0;
+    }
+    const tel = this.telemetry;
+    tel.longitudinalG = (speed - this.prevForward) / Math.max(dt, 1e-3) / GRAVITY;
+    tel.speed = Math.abs(speed);
+    tel.forwardSpeed = speed;
+    tel.groundedWheels = this.wheels.length;
+    tel.steer = steer;
+    tel.lateralG = 0;
+    this.prevForward = speed;
+    this.drivetrain.matchGear(speed / d.wheelRadius);
+    tel.gear = this.drivetrain.gear;
+    tel.rpm = this.drivetrain.rpm;
+  }
+
+  /** Leaves kinematic mode moving forward at `speed` from the given pose. */
+  resume(x: number, y: number, z: number, yaw: number, pitch: number, speed: number): void {
+    this.setKinematic(false);
+    this.posScratch.x = x;
+    this.posScratch.y = y;
+    this.posScratch.z = z;
+    this.body.setTranslation(this.posScratch, true);
+    this.body.setRotation(yawPitch(yaw, pitch, this.rotationScratch), true);
+    const fx = Math.sin(yaw) * Math.cos(pitch);
+    const fz = Math.cos(yaw) * Math.cos(pitch);
+    this.posScratch.x = fx * speed;
+    this.posScratch.y = Math.sin(pitch) * speed;
+    this.posScratch.z = fz * speed;
+    this.body.setLinvel(this.posScratch, true);
+    this.body.setAngvel(this.zero, true);
+    for (let i = 0; i < this.wheels.length; i++) {
+      const w = this.wheels[i];
+      w.omega = speed / this.def.wheelRadius;
+      w.compression = this.restCompression[i];
+    }
+    this.drivetrain.matchGear(speed / this.def.wheelRadius);
+    this.prevForward = speed;
+  }
+
+  private readonly zero = { x: 0, y: 0, z: 0 };
+  private readonly posScratch = { x: 0, y: 0, z: 0 };
+  private readonly rotationScratch = { x: 0, y: 0, z: 0, w: 1 };
+  /** Static-load suspension compression per wheel (the hardpoints were placed for it). */
+  private get restCompression(): number[] {
+    if (!this.sag)
+      this.sag = this.wheels.map((w) => this.def.wheelRadius + this.def.suspension.restLength - w.hy);
+    return this.sag;
+  }
+  private sag: number[] | null = null;
+
   /** Teleports the vehicle (spawns, resets) and clears its motion. */
   teleport(x: number, y: number, z: number, yaw: number): void {
     const half = yaw / 2;
@@ -704,6 +802,26 @@ export class RaycastVehicle implements VehicleSim {
   wheelRpm(index: number): number {
     return ((this.wheels[index]?.omega ?? 0) * RAD_S_TO_RPM) | 0;
   }
+}
+
+/** Quaternion for a heading (yaw about +Y, 0 = +Z) and a pitch (+ = nose up). */
+export function yawPitch(
+  yaw: number,
+  pitch: number,
+  out: { x: number; y: number; z: number; w: number },
+): { x: number; y: number; z: number; w: number } {
+  // q = q_yaw · q_pitch, with nose-up pitch = rotation about +X by −pitch.
+  const hy = yaw / 2;
+  const hp = -pitch / 2;
+  const cy = Math.cos(hy);
+  const sy = Math.sin(hy);
+  const cp = Math.cos(hp);
+  const sp = Math.sin(hp);
+  out.x = cy * sp;
+  out.y = sy * cp;
+  out.z = -sy * sp;
+  out.w = cy * cp;
+  return out;
 }
 
 /**

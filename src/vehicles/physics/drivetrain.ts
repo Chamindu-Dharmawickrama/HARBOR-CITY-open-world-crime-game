@@ -98,6 +98,25 @@ export class Drivetrain {
     return this.gearbox.ratios.length;
   }
 
+  /**
+   * Jumps straight to the highest forward gear that keeps the engine comfortably above idle at
+   * this wheel speed (no shift delay) — for a vehicle handed to the simulation already moving.
+   */
+  matchGear(wheelOmega: number): void {
+    const e = this.engine;
+    const g = this.gearbox;
+    let pick = 1;
+    for (let i = 1; i <= this.topGear; i++) {
+      const rpm = Math.abs(wheelOmega * (g.ratios[i - 1] ?? 0) * g.finalDrive) * RAD_S_TO_RPM;
+      if (rpm >= Math.max(e.idleRpm * 1.4, e.redlineRpm * 0.3)) pick = i;
+    }
+    this.gear = pick;
+    this.shifting = 0;
+    this.cooldown = 0.5;
+    const rpm = Math.abs(wheelOmega * this.ratio) * RAD_S_TO_RPM;
+    this.rpm = Math.max(e.idleRpm, Math.min(e.redlineRpm, rpm));
+  }
+
   shiftTo(gear: number): void {
     const clamped = Math.max(-1, Math.min(this.topGear, gear));
     if (clamped === this.gear) return;

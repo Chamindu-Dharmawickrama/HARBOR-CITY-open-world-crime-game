@@ -15,6 +15,8 @@ import type { VehicleSim, WaterQuery } from './sim/vehicle-sim';
 import type { VehicleDef } from './vehicle-def';
 
 export type DriverKind = 'none' | 'player' | 'npc';
+/** Who keeps the vehicle in the world: parked-car streaming, the traffic system, or nobody (spawned). */
+export type VehicleOwner = 'parked' | 'traffic' | 'free';
 
 /** One vehicle in the world: simulation, view, ECS entity and gameplay state. */
 export interface VehicleInstance {
@@ -47,6 +49,14 @@ export interface VehicleInstance {
    * apart by the solver with huge contact forces that are not a crash.
    */
   spawnGrace: number;
+  owner: VehicleOwner;
+  /** Controls are written by an AI driver (the manager leaves them alone). */
+  aiDriven: boolean;
+  /** Someone is getting in (or pulling the driver out): an AI driver must stop and wait. */
+  held: boolean;
+  /** Turn signal (−1 left, 1 right, 0 off) and hazard lights. */
+  indicator: number;
+  hazard: boolean;
 }
 
 export interface SpawnOptions {
@@ -54,6 +64,7 @@ export interface SpawnOptions {
   locked?: boolean;
   engineOn?: boolean;
   spot?: number;
+  owner?: VehicleOwner;
 }
 
 const pose: PoseOut = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 };
@@ -125,6 +136,11 @@ export class VehicleManager {
       restTime: 0,
       occupant: null,
       spawnGrace: 1.5,
+      owner: options.owner ?? 'free',
+      aiDriven: false,
+      held: false,
+      indicator: 0,
+      hazard: false,
     };
     this.vehicles.push(instance);
     this.byBodyHandle.set(sim.body.handle, instance);
@@ -187,8 +203,8 @@ export class VehicleManager {
       fixedUpdate: (ctx): void => {
         for (const v of this.vehicles) {
           if (v.spawnGrace > 0) v.spawnGrace -= ctx.dt;
-          // NPC drivers hold the brakes until the traffic AI (M4) drives them.
-          if (v.driver !== 'player' || v.wrecked) {
+          // Without a driver (or an AI writing the controls) the brakes hold the vehicle.
+          if ((v.driver !== 'player' && !v.aiDriven) || v.wrecked) {
             if (v.sim.speed < 1.5 || v.wrecked) parkedControls(v.sim.controls);
             else {
               // Driverless but rolling (bailed out): coast to a stop.
@@ -213,7 +229,8 @@ export class VehicleManager {
               v.restTime = 0;
             }
           }
-          v.sim.step(ctx.dt);
+          // Far traffic is kinematic: its pose comes from the traffic system.
+          if (!(v.sim instanceof RaycastVehicle && v.sim.kinematic)) v.sim.step(ctx.dt);
         }
       },
     };
@@ -241,8 +258,8 @@ export class VehicleManager {
             v.sim.engineOn ? 0.35 : 0,
             driven && t.gear >= 0 && v.sim.controls.brake > 0.1 && t.forwardSpeed > 0.3,
             driven && t.gear < 0,
-            v.onFire,
-            v.onFire,
+            v.onFire || v.hazard || v.indicator < 0,
+            v.onFire || v.hazard || v.indicator > 0,
             v.siren,
             this.barPhase,
           );

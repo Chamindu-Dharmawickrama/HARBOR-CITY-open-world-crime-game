@@ -124,7 +124,17 @@ async function main() {
           timeout: 180_000,
         });
         const result = await page.evaluate(() => window.__HARBOR__.bench.result);
-        results.push({ ...result, errors });
+        // Population at the end of the run (scenes without traffic have no such probes).
+        const population = await page.evaluate(() => {
+          const api = window.__HARBOR__;
+          const names = api.probes();
+          return {
+            cars: names.includes('traffic') ? api.probe('traffic').count : null,
+            physicsCars: names.includes('traffic') ? api.probe('traffic').physics : null,
+            peds: names.includes('peds') ? api.probe('peds').count : null,
+          };
+        });
+        results.push({ ...result, population, errors });
         console.log(`  ${preset}: ${result.fps.toFixed(1)} fps on ${result.gpu}`);
       } finally {
         await browser.close();
@@ -154,6 +164,17 @@ async function main() {
   console.log('preset     fps  avg ms  p95 ms  p99 ms  cpu ms  draws  ktris  heapMB/s  >50ms  resolution');
   for (const r of results) console.log(formatRow(r));
   for (const r of results) {
+    if (r.population?.cars !== null && r.population?.cars !== undefined)
+      console.log(
+        `  ${r.preset} population: ${r.population.cars} cars (${r.population.physicsCars} physics), ${r.population.peds} pedestrians`,
+      );
+    if (r.systems)
+      console.log(
+        `  ${r.preset} systems (avg ms/frame): ${r.systems
+          .slice(0, 12)
+          .map((x) => `${x.name} ${x.avgMs.toFixed(2)}`)
+          .join(', ')}`,
+      );
     if (r.longTasks)
       console.log(
         `  ${r.preset} long tasks: ${r.longTasks.count} (max ${r.longTasks.maxMs.toFixed(0)} ms, total ${r.longTasks.totalMs.toFixed(0)} ms)`,

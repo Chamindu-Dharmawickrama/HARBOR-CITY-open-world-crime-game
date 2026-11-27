@@ -154,6 +154,14 @@ export class Animator {
     this.punchTime = 0;
   }
 
+  /** Blends from an externally given pose (a ragdoll's last pose) into the animation over `fade` s. */
+  snapFrom(pose: Pose, fade: number): void {
+    this.from.copy(pose);
+    this.last.copy(pose);
+    this.fade = 0;
+    this.fadeDuration = Math.max(0.05, fade);
+  }
+
   flinch(strength = 1): void {
     this.hitTime = 0;
     this.hitStrength = clamp01(strength);

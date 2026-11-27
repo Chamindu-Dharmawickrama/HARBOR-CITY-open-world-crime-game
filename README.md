@@ -65,10 +65,12 @@ Locked cars: press F to smash the window, then hold still while it hotwires. Occ
 | Player state | `damage <n>`, `heal`, `armor`, `kill`, `respawn`, `tpplayer <x> <z>` |
 | Vehicles | `spawncar <id> [enter|locked|driver]` (ids: brisa meridian cab vireo brakker haul courier linewalker sprint interceptor medic bulwark vaultline gullwing patrol), `fix`, `explode`, `vdamage <n>`, `siren`, `gearbox manual|auto`, `telemetry` (with F3) |
 | Driving pad | `course`, then `tpplayer pad` (200 m pad, ramp), `tpplayer barrier` (crash wall), `tpplayer mooring` (boats) |
+| Traffic & crowds | `traffic on|off|clear`, `peds on|off|clear` (both print statistics), `time HH:MM [game min/s]` (density follows the hour), `lanes` (draws lanes, occupied junction paths, stop-line lights and pedestrian routes), `nearsignal` (go to a signalled crosswalk), `gunshot` (people panic, drivers flee), `pedtest` (launches a car at the nearest pedestrian) |
 
 The M0 physics playground (`?scene=playground`) uses the fly camera; left click throws a box.
 
 ## Quality gate
 
 `npm run ci` runs typecheck, lint (ESLint, Prettier, layer rules), unit + physics tests, production build and
-Playwright smoke tests. `npm run bench -- --presets=low,medium,high` runs the GPU benchmark.
+Playwright smoke tests. `npm run bench -- --presets=low,medium,high` runs the GPU benchmark
+(`--scenario=flythrough|traffic|playground`; `traffic` rides along with AI cars at rush hour).

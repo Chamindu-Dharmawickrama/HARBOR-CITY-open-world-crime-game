@@ -2,9 +2,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { PropType } from '../gen/types';
 
-/** Emissive channel values: 0 none, 1 lit at night, 2 always lit. */
+/** Emissive channel values: 0 none, 1 lit at night (2 = always lit is understood by the material). */
 const NIGHT = 1;
-const ALWAYS = 2;
 
 interface Part {
   geometry: THREE.BufferGeometry;
@@ -109,7 +108,8 @@ function trafficLight(): THREE.BufferGeometry {
     { geometry: box(0.36, 1.0, 0.28, 0, 3.0, 0.12), color: 0x1e2124 },
     { geometry: cylAt(0.11, 0.04, Math.PI / 2, 0, 0, 3.32, 0.27), color: 0x441010 },
     { geometry: cylAt(0.11, 0.04, Math.PI / 2, 0, 0, 3.0, 0.27), color: 0x443010 },
-    { geometry: cylAt(0.11, 0.04, Math.PI / 2, 0, 0, 2.68, 0.27), color: 0x3cff6a, emissive: ALWAYS },
+    // Unlit lenses: the live aspect is drawn over them by the traffic signal view.
+    { geometry: cylAt(0.11, 0.04, Math.PI / 2, 0, 0, 2.68, 0.27), color: 0x103c18 },
   ]);
 }
 

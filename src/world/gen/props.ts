@@ -29,6 +29,7 @@ import type {
   Pier,
   PropSpec,
   PropType,
+  SignalHead,
   SignSpec,
 } from './types';
 
@@ -65,6 +66,7 @@ export function placeProps(
   city: CityDef,
   terrain: TerrainModel,
   rngs: RngStreams,
+  signalHeads: SignalHead[] = [],
 ): PropSpec[] {
   const out = sink();
   const junctionNodes = junctions.map((j) => ({ p: graph.nodes[j.node], r: j.radius }));
@@ -85,7 +87,7 @@ export function placeProps(
     if (block.use === 'plaza') placePlaza(out, block, rng, terrain);
   }
   for (const junction of junctions)
-    if (junction.signalized) placeTrafficLights(out, graph, junction, terrain);
+    if (junction.signalized) placeTrafficLights(out, graph, junction, terrain, signalHeads);
   for (const building of buildings) placeRooftop(out, building, rngs.get(`roof:${building.district}`));
   for (const lot of lots) {
     if (lot.use === 'yard') placeContainers(out, lot, rngs.get('containers'), terrain, city);
@@ -235,6 +237,7 @@ function placeTrafficLights(
   graph: PlanarGraph,
   junction: Junction,
   terrain: TerrainModel,
+  heads: SignalHead[],
 ): void {
   const node = graph.nodes[junction.node] as Vec2;
   for (const trim of junction.trims) {
@@ -245,6 +248,7 @@ function placeTrafficLights(
     // Traffic approaching from this edge travels along -d; its kerb is on the right of -d.
     const right = perpendicular(scale(d, -1));
     const p = add(add(node, scale(d, trim.distance + 0.8)), scale(right, edge.attrs.width / 2 + 1));
+    heads.push({ prop: out.props.length, junction: junction.node, edge: trim.edge });
     out.add('trafficLight', p.x, terrain.heightAt(p.x, p.z) + SIDEWALK_HEIGHT, p.z, facing(d));
   }
 }

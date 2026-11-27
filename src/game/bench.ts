@@ -29,6 +29,8 @@ export interface BenchResult extends BenchMeta {
   longTasks: { count: number; maxMs: number; totalMs: number };
   /** Worst frames with the systems that took the most time in them. */
   hitches: BenchHitch[];
+  /** Whole-run average ms per frame of the costliest systems. */
+  systems?: { name: string; avgMs: number }[];
 }
 
 export interface BenchHitch {
