@@ -1,8 +1,8 @@
 # HARBOR CITY — Plan
 
 Original-IP open-world third-person crime game for the browser. This document is the architecture, risk register,
-milestone list with acceptance criteria, and the running list of known limitations. CLAUDE.md holds commands,
-conventions and current milestone status.
+milestone list with acceptance criteria, and the running list of known limitations. README.md holds setup, controls
+and the current milestone status.
 
 ## 0. Decisions log
 
@@ -317,10 +317,10 @@ T4  police  missions  ui
 | WebGL in headless CI | SwiftShader flags, Low preset, small viewport; perf measured only by headed bench |
 | Audio autoplay policy | Click-to-start screen; Playwright clicks it |
 | Accidental IP overlap | Original names only + deny-list test |
-| Long autonomous run loses context | CLAUDE.md status, commit per milestone, limitations in §8 |
+| Long autonomous run loses context | Status table in README.md, commit per milestone, limitations in §8 |
 
 ## 7. Milestones and acceptance criteria
-Every milestone ends with the same gate: `npm run ci` passes, Playwright smoke saves screenshots, CLAUDE.md status
+Every milestone ends with the same gate: `npm run ci` passes, Playwright smoke saves screenshots, README.md status
 updated, commit `M<n>: …`, short report (what works, known-broken, how to hand-test).
 
 **M0 — Scaffold, game loop, debug overlay, CI**

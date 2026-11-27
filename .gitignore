@@ -7,4 +7,8 @@ coverage/
 *.log
 .vite/
 .DS_Store
-.claude/settings.local.json
+
+# AI agent instructions / prompts — kept local, never uploaded
+CLAUDE.md
+CLAUDE.local.md
+.claude/
